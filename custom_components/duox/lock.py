@@ -1,4 +1,4 @@
-"""Lock platform for Fermax Blue."""
+"""Lock platform for Fermax Duox."""
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_LOCK_STATE_RESET, DEVICE_MANUFACTURER, DOMAIN, HASS_BLUECON_VERSION
+from .const import CONF_LOCK_STATE_RESET, DEVICE_MANUFACTURER, DOMAIN, HASS_DUOX_VERSION
 from .fermax_api import AccessDoor, DeviceInfo as FermaxDeviceInfo, FermaxClient, Pairing
 
 
@@ -23,7 +23,7 @@ async def async_setup_entry(
     pairings: list[Pairing] = hass.data[DOMAIN][config.entry_id]["pairings"]
     lock_timeout = config.options.get(CONF_LOCK_STATE_RESET, 5)
 
-    locks: list[BlueConLock] = []
+    locks: list[DuoxLock] = []
 
     for pairing in pairings:
         device_info: FermaxDeviceInfo = hass.data[DOMAIN][config.entry_id][
@@ -34,13 +34,13 @@ async def async_setup_entry(
             if not door.visible:
                 continue
             locks.append(
-                BlueConLock(client, pairing.device_id, door, device_info, lock_timeout)
+                DuoxLock(client, pairing.device_id, door, device_info, lock_timeout)
             )
 
     async_add_entities(locks)
 
 
-class BlueConLock(LockEntity):
+class DuoxLock(LockEntity):
     _attr_should_poll = False
 
     def __init__(
@@ -89,5 +89,5 @@ class BlueConLock(LockEntity):
             name=f"{self._model} {self._device_id}",
             manufacturer=DEVICE_MANUFACTURER,
             model=self._model,
-            sw_version=HASS_BLUECON_VERSION,
+            sw_version=HASS_DUOX_VERSION,
         )

@@ -2,14 +2,14 @@
     "config": {
         "step": {
             "user": {
-                "title": "Regístrate con tu cuenta Fermax Blue",
+                "title": "Regístrate con tu cuenta Fermax Duox",
                 "data": {
                     "username": "Nombre de usuario",
                     "password": "Contraseña"
                 }
             },
             "reconfigure": {
-                "title": "Regístrate con tu cuenta Fermax Blue",
+                "title": "Regístrate con tu cuenta Fermax Duox",
                 "data": {
                     "username": "Nombre de usuario",
                     "password": "Contraseña"

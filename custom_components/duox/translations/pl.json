@@ -2,14 +2,14 @@
     "config": {
         "step": {
             "user": {
-                "title": "Zaloguj się za pomocą konta Fermax Blue",
+                "title": "Zaloguj się za pomocą konta Fermax Duox",
                 "data": {
                     "username": "Nazwa użytkownika",
                     "password": "Hasło"
                 }
             },
             "reconfigure": {
-                "title": "Zaloguj się za pomocą konta Fermax Blue",
+                "title": "Zaloguj się za pomocą konta Fermax Duox",
                 "data": {
                     "username": "Nazwa użytkownika",
                     "password": "Hasło"

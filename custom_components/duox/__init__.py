@@ -1,4 +1,4 @@
-"""The Fermax Blue (BlueCon) integration."""
+"""The Fermax Duox integration."""
 from __future__ import annotations
 
 import logging
@@ -24,7 +24,7 @@ PLATFORMS: list[Platform] = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Fermax Blue from a config entry."""
+    """Set up Fermax Duox from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     session = async_get_clientsession(hass)

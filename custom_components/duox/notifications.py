@@ -1,4 +1,4 @@
-"""FCM notification listener for Fermax Blue doorbell events."""
+"""FCM notification listener for Fermax Duox doorbell events."""
 from __future__ import annotations
 
 import logging

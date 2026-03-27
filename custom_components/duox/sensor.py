@@ -1,4 +1,4 @@
-"""Sensor platform for Fermax Blue (WiFi signal strength)."""
+"""Sensor platform for Fermax Duox (WiFi signal strength)."""
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -8,7 +8,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEVICE_MANUFACTURER, DOMAIN, HASS_BLUECON_VERSION
+from .const import DEVICE_MANUFACTURER, DOMAIN, HASS_DUOX_VERSION
 from .coordinator import FermaxCoordinator
 from .fermax_api import DeviceInfo as FermaxDeviceInfo, Pairing
 
@@ -29,19 +29,19 @@ async def async_setup_entry(
     coordinator: FermaxCoordinator = hass.data[DOMAIN][config.entry_id]["coordinator"]
     pairings: list[Pairing] = hass.data[DOMAIN][config.entry_id]["pairings"]
 
-    sensors: list[BlueConWifiSensor] = []
+    sensors: list[DuoxWifiSensor] = []
     for pairing in pairings:
         device_info: FermaxDeviceInfo = hass.data[DOMAIN][config.entry_id][
             "device_info"
         ][pairing.device_id]
         sensors.append(
-            BlueConWifiSensor(coordinator, pairing.device_id, device_info)
+            DuoxWifiSensor(coordinator, pairing.device_id, device_info)
         )
 
     async_add_entities(sensors)
 
 
-class BlueConWifiSensor(CoordinatorEntity[FermaxCoordinator], SensorEntity):
+class DuoxWifiSensor(CoordinatorEntity[FermaxCoordinator], SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = ["terrible", "bad", "weak", "good", "excellent", "unknown"]
     _attr_translation_key = "wifi_signal"
@@ -73,5 +73,5 @@ class BlueConWifiSensor(CoordinatorEntity[FermaxCoordinator], SensorEntity):
             name=f"{self._model} {self._device_id}",
             manufacturer=DEVICE_MANUFACTURER,
             model=self._model,
-            sw_version=HASS_BLUECON_VERSION,
+            sw_version=HASS_DUOX_VERSION,
         )

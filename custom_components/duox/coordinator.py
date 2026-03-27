@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for Fermax Blue."""
+"""DataUpdateCoordinator for Fermax Duox."""
 from __future__ import annotations
 
 import logging
@@ -27,7 +27,7 @@ class FermaxCoordinator(DataUpdateCoordinator[dict[str, DeviceInfo]]):
         super().__init__(
             hass,
             LOGGER,
-            name="Fermax Blue",
+            name="Fermax Duox",
             update_interval=SCAN_INTERVAL,
         )
         self.client = client

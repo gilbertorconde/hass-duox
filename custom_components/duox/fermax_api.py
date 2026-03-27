@@ -1,4 +1,4 @@
-"""Fermax Blue API Client."""
+"""Fermax Duox API Client."""
 from __future__ import annotations
 
 import datetime
@@ -128,7 +128,7 @@ class DeviceInfo:
     def model(self) -> str:
         parts = [self.type, self.subtype, self.family]
         model = " ".join(p for p in parts if p).strip()
-        return model or "Fermax Blue Device"
+        return model or "Fermax Duox Device"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DeviceInfo:
@@ -175,7 +175,7 @@ class FermaxConnectionError(FermaxError):
 
 
 class FermaxClient:
-    """Fermax Blue API Client."""
+    """Fermax Duox API Client."""
 
     def __init__(
         self,

@@ -2,27 +2,27 @@
     "config": {
         "step": {
             "user": {
-                "title": "Sign-in with Fermax Blue account",
+                "title": "Sign-in with Fermax Duox account",
                 "data": {
-                    "username": "Username",
-                    "password": "Password"
+                    "username": "[%key:common::config_flow::data::username%]",
+                    "password": "[%key:common::config_flow::data::password%]"
                 }
             },
             "reconfigure": {
-                "title": "Sign-in with Fermax Blue account",
+                "title": "Sign-in with Fermax Duox account",
                 "data": {
-                    "username": "Username",
-                    "password": "Password"
+                    "username": "[%key:common::config_flow::data::username%]",
+                    "password": "[%key:common::config_flow::data::password%]"
                 }
             }
         },
         "error": {
-            "invalid_auth": "Invalid authentication",
-            "unknown": "Unexpected error"
+            "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+            "unknown": "[%key:common::config_flow::error::unknown%]"
         },
         "abort": {
-            "already_configured": "Account is already configured",
-            "reconfigure_successful": "Integration reconfigured",
+            "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+            "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]",
             "entry_not_found": "Entry not found"
         }
     },

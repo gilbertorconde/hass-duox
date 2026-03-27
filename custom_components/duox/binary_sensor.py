@@ -1,4 +1,4 @@
-"""Binary sensor platform for Fermax Blue."""
+"""Binary sensor platform for Fermax Duox."""
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import (
@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DEVICE_MANUFACTURER,
     DOMAIN,
-    HASS_BLUECON_VERSION,
+    HASS_DUOX_VERSION,
     SIGNAL_CALL_ENDED,
     SIGNAL_CALL_STARTED,
 )
@@ -40,7 +40,7 @@ async def async_setup_entry(
         ][pairing.device_id]
 
         sensors.append(
-            BlueConConnectionSensor(coordinator, pairing.device_id, device_info)
+            DuoxConnectionSensor(coordinator, pairing.device_id, device_info)
         )
 
         if has_fcm:
@@ -48,7 +48,7 @@ async def async_setup_entry(
                 if not door.visible:
                     continue
                 sensors.append(
-                    BlueConDoorbellSensor(
+                    DuoxDoorbellSensor(
                         pairing.device_id, door.name, device_info
                     )
                 )
@@ -56,7 +56,7 @@ async def async_setup_entry(
     async_add_entities(sensors)
 
 
-class BlueConConnectionSensor(
+class DuoxConnectionSensor(
     CoordinatorEntity[FermaxCoordinator], BinarySensorEntity
 ):
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -87,11 +87,11 @@ class BlueConConnectionSensor(
             name=f"{self._model} {self._device_id}",
             manufacturer=DEVICE_MANUFACTURER,
             model=self._model,
-            sw_version=HASS_BLUECON_VERSION,
+            sw_version=HASS_DUOX_VERSION,
         )
 
 
-class BlueConDoorbellSensor(BinarySensorEntity):
+class DuoxDoorbellSensor(BinarySensorEntity):
     """Binary sensor that turns on when the doorbell rings (via FCM push)."""
 
     _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
@@ -147,5 +147,5 @@ class BlueConDoorbellSensor(BinarySensorEntity):
             name=f"{self._model} {self._device_id}",
             manufacturer=DEVICE_MANUFACTURER,
             model=self._model,
-            sw_version=HASS_BLUECON_VERSION,
+            sw_version=HASS_DUOX_VERSION,
         )

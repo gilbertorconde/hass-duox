@@ -1,4 +1,4 @@
-"""Button platform for Fermax Blue (F1 relay)."""
+"""Button platform for Fermax Duox (F1 relay)."""
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEVICE_MANUFACTURER, DOMAIN, HASS_BLUECON_VERSION
+from .const import DEVICE_MANUFACTURER, DOMAIN, HASS_DUOX_VERSION
 from .fermax_api import DeviceInfo as FermaxDeviceInfo, FermaxClient, Pairing
 
 
@@ -19,17 +19,17 @@ async def async_setup_entry(
     client: FermaxClient = hass.data[DOMAIN][config.entry_id]["client"]
     pairings: list[Pairing] = hass.data[DOMAIN][config.entry_id]["pairings"]
 
-    buttons: list[BlueConF1Button] = []
+    buttons: list[DuoxF1Button] = []
     for pairing in pairings:
         device_info: FermaxDeviceInfo = hass.data[DOMAIN][config.entry_id][
             "device_info"
         ][pairing.device_id]
-        buttons.append(BlueConF1Button(client, pairing.device_id, device_info))
+        buttons.append(DuoxF1Button(client, pairing.device_id, device_info))
 
     async_add_entities(buttons)
 
 
-class BlueConF1Button(ButtonEntity):
+class DuoxF1Button(ButtonEntity):
     _attr_icon = "mdi:keyboard-f1"
 
     def __init__(
@@ -54,5 +54,5 @@ class BlueConF1Button(ButtonEntity):
             name=f"{self._model} {self._device_id}",
             manufacturer=DEVICE_MANUFACTURER,
             model=self._model,
-            sw_version=HASS_BLUECON_VERSION,
+            sw_version=HASS_DUOX_VERSION,
         )
