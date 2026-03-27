@@ -1,14 +1,22 @@
 """FCM notification listener for Fermax Duox doorbell events.
 
-Uses Android-style GCM registration (matching the real Fermax Blue app)
-and registers the raw GCM token with Fermax — the same approach the
-native Android app takes.  The firebase-messaging library is used only
-for the MCS persistent connection that receives push messages.
+Replicates the exact registration flow from the ``rustPlusPushReceiver``
+library's ``AndroidFCM`` class that the original bluecon library uses:
+
+1. Firebase Installation  (with X-Android-Package / X-Android-Cert headers)
+2. GCM check-in
+3. GCM register           (with Firebase Installations Auth token)
+4. Register the raw GCM token with Fermax
+
+The ``firebase-messaging`` library is used only for the MCS persistent
+connection that receives push messages from Google.
 """
 from __future__ import annotations
 
 import hashlib
 import logging
+import secrets
+from base64 import b64encode
 from typing import Any
 
 from aiohttp import ClientSession, ClientTimeout
@@ -33,9 +41,20 @@ from .fermax_api import FermaxClient
 
 LOGGER = logging.getLogger(__name__)
 
-FCM_CREDENTIALS_STORAGE_VERSION = 3
+FCM_CREDENTIALS_STORAGE_VERSION = 4
 
 GCM_REGISTER_URL = "https://android.clients.google.com/c2dm/register3"
+FIREBASE_INSTALL_URL = (
+    "https://firebaseinstallations.googleapis.com/v1/"
+    f"projects/{FCM_PROJECT_ID}/installations"
+)
+FIREBASE_CLIENT_HEADER = (
+    "android-min-sdk/23 fire-core/20.0.0 device-name/a21snnxx "
+    "device-brand/samsung device-model/a21s "
+    "android-installer/com.android.vending fire-android/30 "
+    "fire-installations/17.0.0 fire-fcm/22.0.0 android-platform/ "
+    "kotlin/1.9.23 android-target-sdk/34"
+)
 
 
 def _build_package_cert() -> str:
@@ -49,25 +68,81 @@ def _build_package_cert() -> str:
     return sha.hexdigest()
 
 
+def _generate_fid() -> str:
+    """Generate a Firebase Installation ID (17 random bytes, FID header)."""
+    fid = bytearray(secrets.token_bytes(17))
+    fid[0] = 0b01110000 + (fid[0] % 0b00010000)
+    return b64encode(fid).decode()
+
+
+async def _firebase_install(session: ClientSession, package_cert: str) -> str:
+    """Create a Firebase Installation and return the auth token."""
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Android-Package": FCM_PACKAGE_NAME,
+        "X-Android-Cert": package_cert,
+        "x-firebase-client": FIREBASE_CLIENT_HEADER,
+        "x-firebase-client-log-type": "3",
+        "x-goog-api-key": FCM_API_KEY,
+        "User-Agent": (
+            "Dalvik/2.1.0 (Linux; U; Android 11; "
+            "SM-A217F Build/RP1A.200720.012)"
+        ),
+    }
+    body = {
+        "fid": _generate_fid(),
+        "appId": FCM_APP_ID,
+        "authVersion": "FIS_v2",
+        "sdkVersion": "a:17.0.0",
+    }
+
+    async with session.post(
+        url=FIREBASE_INSTALL_URL,
+        headers=headers,
+        json=body,
+        timeout=ClientTimeout(total=10),
+    ) as resp:
+        data = await resp.json()
+
+    auth_token = (data.get("authToken") or {}).get("token")
+    if not auth_token:
+        raise RuntimeError(f"Firebase installation failed: {data}")
+    LOGGER.info("Firebase installation auth token obtained")
+    return auth_token
+
+
 async def _android_gcm_register(
     session: ClientSession,
     android_id: int,
     security_token: int,
+    installation_auth_token: str,
+    package_cert: str,
     retries: int = 5,
 ) -> str | None:
     """Register with GCM as the Fermax Android app and return the GCM token."""
-    package_cert = _build_package_cert()
     headers = {
         "Authorization": f"AidLogin {android_id}:{security_token}",
         "Content-Type": "application/x-www-form-urlencoded",
-        "app": FCM_PACKAGE_NAME,
     }
     body = {
-        "app": FCM_PACKAGE_NAME,
-        "X-subtype": FCM_SENDER_ID,
-        "sender": FCM_SENDER_ID,
         "device": str(android_id),
+        "app": FCM_PACKAGE_NAME,
         "cert": package_cert,
+        "app_ver": "1",
+        "X-subtype": FCM_SENDER_ID,
+        "X-app_ver": "1",
+        "X-osv": "29",
+        "X-cliv": "fiid-21.1.1",
+        "X-gmsv": "220217001",
+        "X-scope": "*",
+        "X-Goog-Firebase-Installations-Auth": installation_auth_token,
+        "X-gms_app_id": FCM_APP_ID,
+        "X-Firebase-Client": FIREBASE_CLIENT_HEADER,
+        "X-Firebase-Client-Log-Type": "1",
+        "X-app_ver_name": "1",
+        "target_ver": "31",
+        "sender": FCM_SENDER_ID,
     }
 
     last_error: str | Exception | None = None
@@ -82,7 +157,7 @@ async def _android_gcm_register(
                 text = await resp.text()
                 if "Error" in text:
                     LOGGER.warning(
-                        "Android GCM register attempt %d/%d failed: %s",
+                        "GCM register attempt %d/%d failed: %s",
                         attempt + 1,
                         retries,
                         text,
@@ -95,16 +170,14 @@ async def _android_gcm_register(
         except Exception as exc:
             last_error = exc
             LOGGER.warning(
-                "Android GCM register attempt %d/%d error",
+                "GCM register attempt %d/%d error",
                 attempt + 1,
                 retries,
                 exc_info=True,
             )
 
     LOGGER.error(
-        "Android GCM registration failed after %d attempts: %s",
-        retries,
-        last_error,
+        "GCM registration failed after %d attempts: %s", retries, last_error
     )
     return None
 
@@ -135,7 +208,7 @@ class FermaxNotificationListener:
         credentials = await self._store.async_load()
 
         if not credentials:
-            LOGGER.info("No FCM credentials — performing Android GCM registration")
+            LOGGER.info("No FCM credentials — performing Android registration")
             credentials = await self._register_android()
             if not credentials:
                 raise RuntimeError("Failed to register with GCM")
@@ -173,26 +246,34 @@ class FermaxNotificationListener:
         LOGGER.info("FCM notification listener started")
 
     async def _register_android(self) -> dict[str, Any] | None:
-        """Perform Android-style GCM registration (no web-push FCM needed).
+        """Replicate AndroidFCM.register() from rustPlusPushReceiver.
 
-        1. GCM check-in  → android_id + security_token  (for MCS login)
-        2. GCM register  → gcm_token  (Android-style, with package name)
+        1. Firebase Installation  (with Android package/cert headers)
+        2. GCM check-in           (for android_id + security_token)
+        3. GCM register           (with installation auth + Android params)
 
-        The GCM token is registered directly with Fermax, matching what the
-        real Android app does.  The firebase-messaging library only needs the
-        GCM credentials to maintain the MCS connection.
+        Returns credentials dict compatible with firebase-messaging's
+        FcmPushClient (needs gcm.android_id and gcm.security_token for
+        the MCS connection).
         """
+        package_cert = _build_package_cert()
+
+        try:
+            install_token = await _firebase_install(
+                self._session, package_cert
+            )
+        except Exception:
+            LOGGER.exception("Firebase installation failed")
+            return None
+
         fcm_config = FcmRegisterConfig(
             FCM_PROJECT_ID,
             FCM_APP_ID,
             FCM_API_KEY,
             FCM_SENDER_ID,
         )
-
         helper = FcmRegister(
-            fcm_config,
-            None,
-            None,
+            fcm_config, None, None,
             http_client_session=self._session,
         )
 
@@ -206,7 +287,11 @@ class FermaxNotificationListener:
             security_token = options["securityToken"]
 
             gcm_token = await _android_gcm_register(
-                self._session, android_id, security_token
+                self._session,
+                android_id,
+                security_token,
+                install_token,
+                package_cert,
             )
             if not gcm_token:
                 return None
