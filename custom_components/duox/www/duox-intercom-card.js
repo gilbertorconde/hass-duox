@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.1";
+const CARD_VERSION = "0.1.2";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -28,6 +28,12 @@ async function loadDeps() {
   ]);
   _mediasoupClient = ms;
   _io = sio.io || sio.default?.io;
+}
+
+function safeParse(val) {
+  if (val == null) return val;
+  if (typeof val === "object") return val;
+  try { return JSON.parse(val); } catch (_) { return val; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -220,12 +226,13 @@ class DuoxIntercomCard extends HTMLElement {
         throw new Error(joinResult.error.code || "join failed");
       }
       const r = joinResult.result;
+      console.debug("[duox-intercom] join_call result keys:", Object.keys(r));
 
       const device = new _mediasoupClient.Device();
-      await device.load({ routerRtpCapabilities: JSON.parse(r.routerRtpCapabilities) });
+      await device.load({ routerRtpCapabilities: safeParse(r.routerRtpCapabilities) });
       this._device = device;
 
-      const iceServers = r.iceServers ? JSON.parse(r.iceServers) : undefined;
+      const iceServers = r.iceServers ? safeParse(r.iceServers) : undefined;
 
       /* Receive-video transport */
       this._recvVideoTransport = this._createRecvTransport(
@@ -354,9 +361,9 @@ class DuoxIntercomCard extends HTMLElement {
   _createRecvTransport(device, tData, iceServers) {
     const transport = device.createRecvTransport({
       id: tData.id,
-      dtlsParameters: JSON.parse(tData.dtlsParameters),
-      iceCandidates: JSON.parse(tData.iceCandidates),
-      iceParameters: JSON.parse(tData.iceParameters),
+      dtlsParameters: safeParse(tData.dtlsParameters),
+      iceCandidates: safeParse(tData.iceCandidates),
+      iceParameters: safeParse(tData.iceParameters),
       iceServers: iceServers,
     });
 
@@ -375,9 +382,9 @@ class DuoxIntercomCard extends HTMLElement {
   _createSendTransport(device, tData, iceServers) {
     const transport = device.createSendTransport({
       id: tData.id,
-      dtlsParameters: JSON.parse(tData.dtlsParameters),
-      iceCandidates: JSON.parse(tData.iceCandidates),
-      iceParameters: JSON.parse(tData.iceParameters),
+      dtlsParameters: safeParse(tData.dtlsParameters),
+      iceCandidates: safeParse(tData.iceCandidates),
+      iceParameters: safeParse(tData.iceParameters),
       iceServers: iceServers,
     });
 
@@ -402,7 +409,7 @@ class DuoxIntercomCard extends HTMLElement {
     const resp = await this._emitAck("transport_consume", {
       transportId: transport.id,
       producerId: producerId,
-      rtpCapabilities: JSON.stringify(caps),
+      rtpCapabilities: typeof caps === "string" ? caps : JSON.stringify(caps),
     });
 
     if (resp.error) throw new Error(resp.error.code || "consume failed");
@@ -412,7 +419,7 @@ class DuoxIntercomCard extends HTMLElement {
       id: cr.id,
       producerId: cr.producerId,
       kind: cr.kind,
-      rtpParameters: JSON.parse(cr.rtpParameters),
+      rtpParameters: safeParse(cr.rtpParameters),
     });
 
     if (kind === "video") {
