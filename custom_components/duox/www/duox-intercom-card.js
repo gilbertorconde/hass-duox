@@ -7,26 +7,27 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.1.1";
 const PROTOCOL_VERSION = "0.8.2";
 
-const MS_CDN = "https://cdn.jsdelivr.net/npm/mediasoup-client@3/lib/mediasoup-client.min.js";
-const SIO_CDN = "https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js";
+const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
+const SIO_CDN = "https://esm.sh/socket.io-client@4?bundle";
 
 /* ------------------------------------------------------------------ */
 /* CDN loader                                                          */
 /* ------------------------------------------------------------------ */
 
-const _loadedScripts = new Set();
-function loadScript(src) {
-  if (_loadedScripts.has(src)) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = src;
-    s.onload = () => { _loadedScripts.add(src); resolve(); };
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
+let _mediasoupClient = null;
+let _io = null;
+
+async function loadDeps() {
+  if (_mediasoupClient && _io) return;
+  const [ms, sio] = await Promise.all([
+    import(MS_CDN),
+    import(SIO_CDN),
+  ]);
+  _mediasoupClient = ms;
+  _io = sio.io || sio.default?.io;
 }
 
 /* ------------------------------------------------------------------ */
@@ -174,7 +175,7 @@ class DuoxIntercomCard extends HTMLElement {
     try {
       this._setState("connecting");
 
-      await Promise.all([loadScript(SIO_CDN), loadScript(MS_CDN)]);
+      await loadDeps();
 
       const callInfo = await this._getActiveCall();
       if (!callInfo) {
@@ -183,7 +184,7 @@ class DuoxIntercomCard extends HTMLElement {
       }
       this._callData = callInfo;
 
-      const socket = io(callInfo.socket_url, {
+      const socket = _io(callInfo.socket_url, {
         transports: ["websocket"],
         reconnection: false,
       });
@@ -220,7 +221,7 @@ class DuoxIntercomCard extends HTMLElement {
       }
       const r = joinResult.result;
 
-      const device = new mediasoupClient.Device();
+      const device = new _mediasoupClient.Device();
       await device.load({ routerRtpCapabilities: JSON.parse(r.routerRtpCapabilities) });
       this._device = device;
 
