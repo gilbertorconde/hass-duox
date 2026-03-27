@@ -3,7 +3,7 @@ DOMAIN = "duox"
 CONF_LOCK_STATE_RESET = "lockStateReset"
 
 DEVICE_MANUFACTURER = "Fermax"
-HASS_DUOX_VERSION = "0.10.0"
+HASS_DUOX_VERSION = "0.10.1"
 
 # Firebase Cloud Messaging credentials (extracted from Fermax DuoxMe APK)
 FCM_SENDER_ID = "***REDACTED_SENDER_ID***"

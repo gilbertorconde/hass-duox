@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.2.1";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -54,13 +54,14 @@ const ICONS = {
 };
 
 function wifiIcon(level) {
-  const arcs = [
-    `<path d="M12 18c.7 0 1.3.6 1.3 1.3 0 .7-.6 1.2-1.3 1.2-.7 0-1.3-.5-1.3-1.2 0-.7.6-1.3 1.3-1.3z" fill="currentColor"/>`,
-    `<path d="M8.46 14.5l1.41 1.41C10.84 14.97 11.86 14.5 13 14.5c-1.14 0-2.16.47-3.13 1.41z" fill="currentColor" opacity="${level >= 2 ? 1 : .2}"/>`,
-    `<path d="M5.64 11.64l1.41 1.41C8.72 11.38 10.28 10.5 12 10.5s3.28.88 4.95 2.55l1.41-1.41C16.36 9.64 14.28 8.5 12 8.5s-4.36 1.14-6.36 3.14z" fill="currentColor" opacity="${level >= 3 ? 1 : .2}"/>`,
-    `<path d="M2.81 8.81l1.41 1.41C6.56 7.88 9.12 6.5 12 6.5s5.44 1.38 7.78 3.72l1.41-1.41C18.47 6.09 15.4 4.5 12 4.5S5.53 6.09 2.81 8.81z" fill="currentColor" opacity="${level >= 4 ? 1 : .2}"/>`,
-  ];
-  return `<svg viewBox="0 0 24 24">${arcs.join("")}</svg>`;
+  const on = "currentColor";
+  const off = "currentColor\" opacity=\".15";
+  return `<svg viewBox="0 0 24 24" fill="none" stroke-width="0">
+    <circle cx="12" cy="19" r="1.5" fill="${level >= 1 ? on : off}"/>
+    <path d="M8.7 15.7a4.7 4.7 0 0 1 6.6 0" stroke="${level >= 2 ? on : off}" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M5.6 12.6a9.2 9.2 0 0 1 12.8 0" stroke="${level >= 3 ? on : off}" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M2.5 9.5a13.8 13.8 0 0 1 19 0" stroke="${level >= 4 ? on : off}" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>`;
 }
 
 const WIFI_MAP = { terrible: 1, bad: 1, weak: 2, good: 3, excellent: 4, unknown: 0 };
@@ -79,6 +80,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._cameraEntity = config.camera_entity || "";
     this._lockEntity = config.lock_entity || "";
     this._wifiEntity = config.wifi_entity || "";
+    this._deviceName = config.device_name || "Doorbell";
     this._hass = null;
     this._state = "idle";
     this._socket = null;
@@ -97,6 +99,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._sheetOpen = false;
     this._callHistory = null;
     this._historyLoading = false;
+    this._photoPreview = null;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -106,11 +109,26 @@ class DuoxIntercomCard extends HTMLElement {
   set hass(hass) {
     const prev = this._hass;
     this._hass = hass;
+
     if (this._wifiEntity && prev) {
       const oldWifi = prev.states[this._wifiEntity];
       const newWifi = hass.states[this._wifiEntity];
       if (oldWifi?.state !== newWifi?.state) {
         this._updateWifiIcon();
+      }
+    }
+
+    if (this._state === "idle" && this._cameraEntity) {
+      const stateObj = hass.states?.[this._cameraEntity];
+      const entityPic = stateObj?.attributes?.entity_picture;
+      if (entityPic) {
+        const img = this.shadowRoot?.querySelector(".video-wrap img");
+        if (img && img.dataset.src !== entityPic) {
+          img.src = entityPic;
+          img.dataset.src = entityPic;
+        } else if (!img && this.shadowRoot) {
+          this._render();
+        }
       }
     }
   }
@@ -153,13 +171,13 @@ class DuoxIntercomCard extends HTMLElement {
       /* -- WiFi indicator ------------------------------------------ */
       .wifi-indicator {
         position: absolute; top: 8px; right: 8px;
-        width: 26px; height: 26px;
+        width: 34px; height: 34px;
         border-radius: 50%;
-        background: rgba(0,0,0,.45);
+        background: rgba(0,0,0,.5);
         display: flex; align-items: center; justify-content: center;
         z-index: 2;
       }
-      .wifi-indicator svg { width: 18px; height: 18px; }
+      .wifi-indicator svg { width: 22px; height: 22px; }
 
       /* -- Controls bar -------------------------------------------- */
       .controls {
@@ -238,7 +256,10 @@ class DuoxIntercomCard extends HTMLElement {
         display: flex; align-items: center; gap: 10px;
         padding: 8px 4px;
         border-bottom: 1px solid var(--divider-color, #eee);
+        cursor: pointer; border-radius: 8px;
+        transition: background .15s;
       }
+      .hist-row:hover { background: var(--secondary-background-color, rgba(0,0,0,.04)); }
       .hist-row:last-child { border-bottom: none; }
       .hist-ico {
         width: 32px; height: 32px; border-radius: 50%;
@@ -276,6 +297,26 @@ class DuoxIntercomCard extends HTMLElement {
         border-radius: 50%;
         animation: spin .6s linear infinite;
       }
+
+      /* -- Photo preview inside sheet ------------------------------ */
+      .photo-preview {
+        padding: 8px 0;
+        text-align: center;
+      }
+      .photo-preview img {
+        max-width: 100%; border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      }
+      .photo-preview .photo-back {
+        display: inline-block; margin-top: 8px;
+        font-size: 12px; color: var(--primary-color, #2196F3);
+        cursor: pointer; padding: 4px 12px;
+        border-radius: 12px; border: 1px solid var(--primary-color, #2196F3);
+        background: transparent;
+        font-family: inherit;
+      }
+      .photo-preview .photo-back:hover { background: rgba(33,150,243,.08); }
+      .photo-loading { text-align: center; padding: 24px 0; }
     `;
   }
 
@@ -284,7 +325,8 @@ class DuoxIntercomCard extends HTMLElement {
   _render() {
     const S = this._state;
     const err = this._error || "";
-    const cam = this._cameraEntity ? `/api/camera_proxy/${this._cameraEntity}` : "";
+    const camState = this._hass?.states?.[this._cameraEntity];
+    const cam = camState?.attributes?.entity_picture || "";
     const wifiState = this._hass?.states?.[this._wifiEntity]?.state || "unknown";
     const wifiLvl = WIFI_MAP[wifiState] ?? 0;
     const wifiClr = WIFI_COLORS[wifiState] || "#888";
@@ -388,6 +430,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._sheetOpen = true;
     this._historyLoading = true;
     this._callHistory = null;
+    this._photoPreview = null;
 
     const ov = this.shadowRoot.getElementById("overlay");
     const sh = this.shadowRoot.getElementById("sheet");
@@ -429,6 +472,20 @@ class DuoxIntercomCard extends HTMLElement {
     const body = this.shadowRoot.getElementById("sheetBody");
     if (!body) return;
 
+    if (this._photoPreview) {
+      body.innerHTML = `<div class="photo-preview">
+        ${this._photoPreview === "loading"
+          ? `<div class="photo-loading"><div class="spinner"></div></div>`
+          : `<img src="data:image/jpeg;base64,${this._photoPreview}" alt="Call snapshot"/>
+             <div><button class="photo-back" id="photoBack">Back to list</button></div>`}
+      </div>`;
+      body.querySelector("#photoBack")?.addEventListener("click", () => {
+        this._photoPreview = null;
+        this._renderSheetContent();
+      });
+      return;
+    }
+
     if (this._historyLoading) {
       body.innerHTML = `<div class="hist-loading"><div class="spinner"></div></div>`;
       return;
@@ -440,7 +497,7 @@ class DuoxIntercomCard extends HTMLElement {
       return;
     }
 
-    body.innerHTML = items.map(e => {
+    body.innerHTML = items.map((e, i) => {
       const state = (e.registerCall || "U").toUpperCase();
       const isAutoon = e.isAutoon === true || e.isAutoon === "true";
       let cssClass, icon;
@@ -457,16 +514,42 @@ class DuoxIntercomCard extends HTMLElement {
         cssClass = "unknown";
         icon = ICONS.phoneIn;
       }
-      const name = e.name || e.deviceId || "Unknown";
+      const name = e.name || this._deviceName;
       const ts = e.callDate ? this._fmtTime(e.callDate) : "";
-      return `<div class="hist-row">
+      const hasPhoto = !!e.photoId;
+      return `<div class="hist-row" data-idx="${i}" ${hasPhoto ? 'data-photo="' + e.photoId + '"' : ""}>
         <div class="hist-ico ${cssClass}">${icon}</div>
         <div class="hist-info">
           <div class="hist-name">${name}</div>
-          <div class="hist-time">${ts}</div>
+          <div class="hist-time">${ts}${hasPhoto ? " \u00b7 tap for photo" : ""}</div>
         </div>
       </div>`;
     }).join("");
+
+    body.querySelectorAll(".hist-row[data-photo]").forEach(row => {
+      row.addEventListener("click", () => {
+        const photoId = row.getAttribute("data-photo");
+        if (photoId) this._loadCallPhoto(photoId);
+      });
+    });
+  }
+
+  async _loadCallPhoto(photoId) {
+    this._photoPreview = "loading";
+    this._renderSheetContent();
+    try {
+      const result = await this._hass.callWS({
+        type: "duox/call_photo",
+        entry_id: this._entryId,
+        photo_id: photoId,
+      });
+      this._photoPreview = result?.image_b64 || null;
+      if (!this._photoPreview) this._photoPreview = null;
+    } catch (e) {
+      console.error("[duox-intercom] call_photo error:", e);
+      this._photoPreview = null;
+    }
+    this._renderSheetContent();
   }
 
   _fmtTime(timestamp) {
@@ -476,9 +559,10 @@ class DuoxIntercomCard extends HTMLElement {
       const diff = now - d.getTime();
       if (diff < 60000) return "Just now";
       if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-      if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago · ${time}`;
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago · ${time}`;
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ` · ${time}`;
     } catch (_) { return ""; }
   }
 
@@ -524,10 +608,12 @@ class DuoxIntercomCard extends HTMLElement {
 
       socket.on("disconnect", () => {
         this._cleanup();
+        this._hass?.callWS({ type: "duox/hangup", entry_id: this._entryId }).catch(() => {});
         this._setState("idle");
       });
       socket.on("end_up", () => {
         this._cleanup();
+        this._hass?.callWS({ type: "duox/hangup", entry_id: this._entryId }).catch(() => {});
         this._setState("idle");
       });
       socket.on("connect_error", (e) => {
@@ -619,6 +705,13 @@ class DuoxIntercomCard extends HTMLElement {
       }
     } catch (_) {}
     this._cleanup();
+    this._callData = null;
+    try {
+      await this._hass.callWS({
+        type: "duox/hangup",
+        entry_id: this._entryId,
+      });
+    } catch (_) {}
     this._setState("idle");
   }
 
@@ -656,6 +749,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._micProducer = null;
     this._videoStream = null;
     this._audioStream = null;
+    this._callData = null;
   }
 
   /* -- Transport helpers ------------------------------------------- */
@@ -810,7 +904,7 @@ class DuoxIntercomCard extends HTMLElement {
   /* -- Card editor helpers ----------------------------------------- */
 
   static getStubConfig() {
-    return { entry_id: "", camera_entity: "", lock_entity: "", wifi_entity: "" };
+    return { entry_id: "", camera_entity: "", lock_entity: "", wifi_entity: "", device_name: "Doorbell" };
   }
 
   getCardSize() {

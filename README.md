@@ -22,7 +22,7 @@ Full intercom experience from Home Assistant — open doors, view live video, ha
 - **Bidirectional Audio** — Full two-way intercom: talk and listen through Home Assistant.
 - **On-Demand View** — Initiate a call to the panel from HA (autoon) without waiting for someone to ring.
 - **Gate Unlock** — Open the door directly from the intercom card while viewing the feed.
-- **Call History** — Browse past calls in a bottom sheet modal (picked up, missed, autoon) fetched from the Fermax API.
+- **Call History** — Browse past calls in a bottom sheet modal (picked up, missed, autoon) fetched from the Fermax API. Tap an entry to view its snapshot photo.
 - **WiFi Indicator** — Live WiFi signal strength icon overlaid on the video area.
 - **Last Snapshot** — Shows the most recent doorbell photo when no call is active, with an overlay badge.
 
@@ -64,6 +64,7 @@ entry_id: "<your_config_entry_id>"
 camera_entity: camera.duox_doorbell_camera
 lock_entity: lock.duox_main
 wifi_entity: sensor.duox_wifi_signal
+device_name: "Front Door"
 ```
 
 | Option | Required | Description |
@@ -72,6 +73,7 @@ wifi_entity: sensor.duox_wifi_signal
 | `camera_entity` | No | Camera entity for snapshot display when idle. |
 | `lock_entity` | No | Lock entity to show a gate-unlock button on the card. |
 | `wifi_entity` | No | WiFi signal sensor entity to show a signal indicator on the card. |
+| `device_name` | No | Human-readable name shown in call history entries (default: "Doorbell"). |
 
 ### Recommended Logging (for troubleshooting)
 
@@ -94,7 +96,7 @@ Video and audio use **mediasoup** (a WebRTC SFU) with **Socket.IO** for signalin
 When you press "Connect" on the card without an active doorbell ring, the integration calls the Fermax `autoon` API (v2) to initiate a call to the panel. The panel camera activates, and the Fermax cloud sends an FCM notification back with the streaming room details. The card then connects to the live feed.
 
 ### Call History
-The card can fetch call history from the Fermax call registry API, showing past calls with their status (picked up, missed, autoon) and timestamps in a sliding bottom sheet.
+The card can fetch call history from the Fermax call registry API, showing past calls with their status (picked up, missed, autoon) and timestamps in a sliding bottom sheet. Tap any entry that has a photo to view the snapshot from that call.
 
 ## Entities Created
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from base64 import b64encode
 from typing import Any
 
 import voluptuous as vol
@@ -20,6 +21,8 @@ async def async_register_ws_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_active_call)
     websocket_api.async_register_command(hass, ws_autoon)
     websocket_api.async_register_command(hass, ws_call_history)
+    websocket_api.async_register_command(hass, ws_call_photo)
+    websocket_api.async_register_command(hass, ws_hangup)
 
 
 @websocket_api.websocket_command(
@@ -196,3 +199,63 @@ async def ws_call_history(
     except Exception as err:
         LOGGER.error("call_history fetch failed: %s", err)
         connection.send_error(msg["id"], "fetch_failed", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "duox/call_photo",
+        vol.Required("entry_id"): str,
+        vol.Required("photo_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_call_photo(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Fetch a call photo by its photoId and return base64-encoded JPEG."""
+    entry_id = msg["entry_id"]
+    data = hass.data.get(DOMAIN, {}).get(entry_id)
+
+    if not data:
+        connection.send_error(msg["id"], "not_found", "Integration entry not found")
+        return
+
+    client = data.get("client")
+    photo_id = msg["photo_id"]
+
+    try:
+        image_bytes = await client.async_get_photo(photo_id)
+        if not image_bytes:
+            connection.send_result(msg["id"], {"image_b64": None})
+            return
+        connection.send_result(
+            msg["id"], {"image_b64": b64encode(image_bytes).decode("ascii")}
+        )
+    except Exception as err:
+        LOGGER.error("call_photo fetch failed: %s", err)
+        connection.send_error(msg["id"], "fetch_failed", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "duox/hangup",
+        vol.Required("entry_id"): str,
+    }
+)
+@callback
+def ws_hangup(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Clear active call data so the next connect attempt starts fresh."""
+    entry_id = msg["entry_id"]
+    data = hass.data.get(DOMAIN, {}).get(entry_id)
+
+    if data:
+        data["active_call"] = None
+        LOGGER.debug("active_call cleared by hangup")
+
+    connection.send_result(msg["id"], {"ok": True})
