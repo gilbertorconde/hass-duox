@@ -24,7 +24,7 @@ from firebase_messaging import FcmPushClient, FcmRegisterConfig
 from firebase_messaging.fcmregister import FcmRegister
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.dispatcher import dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -404,15 +404,15 @@ class FermaxNotificationListener:
                 access_door_key,
                 call_data["room_id"],
             )
-            dispatcher_send(
+            async_dispatcher_send(
                 self._hass,
                 SIGNAL_CALL_STARTED.format(device_id, access_door_key),
             )
-            self._hass.bus.fire(
+            self._hass.bus.async_fire(
                 f"{DOMAIN}_doorbell_ring",
                 {"device_id": device_id, "access_door_key": access_door_key},
             )
-            self._hass.bus.fire(
+            self._hass.bus.async_fire(
                 f"{DOMAIN}_incoming_call",
                 call_data,
             )
@@ -425,7 +425,7 @@ class FermaxNotificationListener:
         elif notif_type == "CallEnd":
             LOGGER.info("Call ended: device=%s", device_id)
             self._hass.data[DOMAIN][self._entry_id]["active_call"] = None
-            dispatcher_send(
+            async_dispatcher_send(
                 self._hass,
                 SIGNAL_CALL_ENDED.format(device_id),
             )
