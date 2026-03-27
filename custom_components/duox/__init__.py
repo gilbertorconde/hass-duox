@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform
@@ -20,6 +21,7 @@ PLATFORMS: list[Platform] = [
     Platform.BUTTON,
     Platform.BINARY_SENSOR,
     Platform.SENSOR,
+    Platform.CAMERA,
 ]
 
 
@@ -67,10 +69,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
         "has_fcm": False,
         "notification_listener": None,
+        "gcm_token": None,
+        "active_call": None,
     }
 
     has_fcm = await _start_fcm_listener(hass, entry, client)
     hass.data[DOMAIN][entry.entry_id]["has_fcm"] = has_fcm
+
+    from .websocket_api import async_register_ws_api
+
+    if not hass.data[DOMAIN].get("_ws_registered"):
+        await async_register_ws_api(hass)
+        hass.data[DOMAIN]["_ws_registered"] = True
+
+    if not hass.data[DOMAIN].get("_www_registered"):
+        www_path = os.path.join(os.path.dirname(__file__), "www")
+        if os.path.isdir(www_path):
+            hass.http.register_static_path(
+                f"/{DOMAIN}/www", www_path, cache_headers=False
+            )
+            hass.data[DOMAIN]["_www_registered"] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(update_listener))

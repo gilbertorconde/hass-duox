@@ -36,6 +36,7 @@ from .const import (
     FCM_SENDER_ID,
     SIGNAL_CALL_ENDED,
     SIGNAL_CALL_STARTED,
+    SIGNALING_SERVER_URL,
 )
 from .fermax_api import FermaxClient
 
@@ -245,6 +246,8 @@ class FermaxNotificationListener:
 
         gcm_token = credentials["gcm"]["token"]
 
+        self._hass.data[DOMAIN][self._entry_id]["gcm_token"] = gcm_token
+
         def on_credentials_updated(creds: dict) -> None:
             self._hass.async_create_task(self._store.async_save(creds))
 
@@ -375,8 +378,31 @@ class FermaxNotificationListener:
         if notif_type == "Call":
             access_door_key = notification.get("AccessDoorKey", "")
             fcm_message_id = persistent_id
+
+            call_data = {
+                "device_id": device_id,
+                "access_door_key": access_door_key,
+                "room_id": notification.get("RoomId", ""),
+                "socket_url": notification.get(
+                    "SocketUrl", SIGNALING_SERVER_URL
+                ),
+                "call_as": notification.get("CallAs", ""),
+                "streaming_mode": notification.get("StreamingMode", ""),
+                "preview_timeout": int(
+                    notification.get("PreviewTimeout", "29")
+                ),
+                "conversation_timeout": int(
+                    notification.get("ConversationTimeout", "90")
+                ),
+            }
+
+            self._hass.data[DOMAIN][self._entry_id]["active_call"] = call_data
+
             LOGGER.info(
-                "Doorbell ring: device=%s door=%s", device_id, access_door_key
+                "Doorbell ring: device=%s door=%s room=%s",
+                device_id,
+                access_door_key,
+                call_data["room_id"],
             )
             dispatcher_send(
                 self._hass,
@@ -386,6 +412,10 @@ class FermaxNotificationListener:
                 f"{DOMAIN}_doorbell_ring",
                 {"device_id": device_id, "access_door_key": access_door_key},
             )
+            self._hass.bus.fire(
+                f"{DOMAIN}_incoming_call",
+                call_data,
+            )
 
             if notification.get("SendAcknowledge"):
                 self._hass.async_create_task(
@@ -394,6 +424,7 @@ class FermaxNotificationListener:
 
         elif notif_type == "CallEnd":
             LOGGER.info("Call ended: device=%s", device_id)
+            self._hass.data[DOMAIN][self._entry_id]["active_call"] = None
             dispatcher_send(
                 self._hass,
                 SIGNAL_CALL_ENDED.format(device_id),

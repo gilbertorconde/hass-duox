@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from base64 import b64decode
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -376,3 +377,31 @@ class FermaxClient:
             url,
             json={"attended": True, "fcmMessageId": fcm_message_id},
         )
+
+    async def async_get_call_registry(
+        self, app_token: str
+    ) -> list[dict[str, Any]]:
+        """Fetch call registry entries for the registered FCM token."""
+        url = (
+            f"{BASE_URL}/callManager/api/v1/callregistry/participant"
+            f"?appToken={app_token}&callRegistryType=all"
+        )
+        result = await self._async_request("GET", url)
+        if isinstance(result, list):
+            return result
+        return []
+
+    async def async_get_photo(self, photo_id: str) -> bytes | None:
+        """Fetch a doorbell snapshot by photo ID. Returns decoded image bytes."""
+        url = f"{BASE_URL}/callManager/api/v1/photocall?photoId={photo_id}"
+        result = await self._async_request("GET", url)
+        if not isinstance(result, dict):
+            return None
+        image_data = (result.get("image") or {}).get("data")
+        if not image_data:
+            return None
+        try:
+            return b64decode(image_data)
+        except Exception:
+            LOGGER.warning("Failed to decode photo data for %s", photo_id)
+            return None
