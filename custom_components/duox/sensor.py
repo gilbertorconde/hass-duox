@@ -57,7 +57,7 @@ class DuoxWifiSensor(CoordinatorEntity[FermaxCoordinator], SensorEntity):
         self._device_id = device_id
         self._model = device_info.model
         self._attr_unique_id = f"{device_id}_wifi_signal".lower()
-        self._attr_name = "WiFi Signal"
+        self._attr_name = "Duox WiFi Signal"
 
     @property
     def native_value(self) -> str | None:

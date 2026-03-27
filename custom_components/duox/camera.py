@@ -73,7 +73,7 @@ class DuoxCamera(Camera):
         self._device_id = pairing.device_id
         self._model = device_info.model
         self._attr_unique_id = f"{pairing.device_id}_camera".lower()
-        self._attr_name = "Doorbell Camera"
+        self._attr_name = "Duox Doorbell Camera"
         self._cached_image: bytes | None = None
         self._cache_ts: float = 0
         self._fetch_lock = asyncio.Lock()

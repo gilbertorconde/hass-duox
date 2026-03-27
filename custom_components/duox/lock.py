@@ -57,7 +57,7 @@ class DuoxLock(LockEntity):
         self._model = device_info.model
         self._lock_timeout = lock_timeout
         self._attr_unique_id = f"{device_id}_{door.name}_door_lock".lower()
-        self._attr_name = door.title or door.name
+        self._attr_name = f"Duox {door.title or door.name}"
         self._attr_is_locked = True
         self._attr_is_locking = False
         self._attr_is_unlocking = False

@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.8";
+const CARD_VERSION = "0.2.0";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -37,6 +37,36 @@ function safeParse(val) {
 }
 
 /* ------------------------------------------------------------------ */
+/* SVG Icons (22x22 viewBox)                                           */
+/* ------------------------------------------------------------------ */
+
+const ICONS = {
+  video: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`,
+  mic: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`,
+  micOff: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`,
+  phoneHangup: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 0 1 0-1.36C3.53 8.46 7.56 6.5 12 6.5s8.47 1.96 11.71 5.22c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.1-.7-.28-.79-.73-1.68-1.36-2.66-1.85a.996.996 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>`,
+  lockOpen: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5-2.28 0-4.27 1.54-4.84 3.75-.14.54.18 1.08.72 1.22.53.14 1.08-.18 1.22-.72C9.44 3.93 10.63 3 12 3c1.65 0 3 1.35 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg>`,
+  history: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>`,
+  phoneIn: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5c-1.25 0-2.45-.2-3.57-.57a1.02 1.02 0 0 0-1.02.24l-2.2 2.2a15.045 15.045 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/></svg>`,
+  phoneMissed: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 5.5L12 11l7-7-1.41-1.41L12 8.17 6.91 3.09 5.5 4.5 6.5 5.5z"/><path d="M20 15.5c-1.25 0-2.45-.2-3.57-.57a1.02 1.02 0 0 0-1.02.24l-2.2 2.2a15.045 15.045 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/></svg>`,
+  autoOn: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>`,
+};
+
+function wifiIcon(level) {
+  const arcs = [
+    `<path d="M12 18c.7 0 1.3.6 1.3 1.3 0 .7-.6 1.2-1.3 1.2-.7 0-1.3-.5-1.3-1.2 0-.7.6-1.3 1.3-1.3z" fill="currentColor"/>`,
+    `<path d="M8.46 14.5l1.41 1.41C10.84 14.97 11.86 14.5 13 14.5c-1.14 0-2.16.47-3.13 1.41z" fill="currentColor" opacity="${level >= 2 ? 1 : .2}"/>`,
+    `<path d="M5.64 11.64l1.41 1.41C8.72 11.38 10.28 10.5 12 10.5s3.28.88 4.95 2.55l1.41-1.41C16.36 9.64 14.28 8.5 12 8.5s-4.36 1.14-6.36 3.14z" fill="currentColor" opacity="${level >= 3 ? 1 : .2}"/>`,
+    `<path d="M2.81 8.81l1.41 1.41C6.56 7.88 9.12 6.5 12 6.5s5.44 1.38 7.78 3.72l1.41-1.41C18.47 6.09 15.4 4.5 12 4.5S5.53 6.09 2.81 8.81z" fill="currentColor" opacity="${level >= 4 ? 1 : .2}"/>`,
+  ];
+  return `<svg viewBox="0 0 24 24">${arcs.join("")}</svg>`;
+}
+
+const WIFI_MAP = { terrible: 1, bad: 1, weak: 2, good: 3, excellent: 4, unknown: 0 };
+const WIFI_COLORS = { terrible: "#f44336", bad: "#f44336", weak: "#FF9800", good: "#4CAF50", excellent: "#4CAF50", unknown: "#888" };
+
+/* ------------------------------------------------------------------ */
 /* Card                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -48,8 +78,9 @@ class DuoxIntercomCard extends HTMLElement {
     this._entryId = config.entry_id || "";
     this._cameraEntity = config.camera_entity || "";
     this._lockEntity = config.lock_entity || "";
+    this._wifiEntity = config.wifi_entity || "";
     this._hass = null;
-    this._state = "idle";       // idle | connecting | preview | call | error
+    this._state = "idle";
     this._socket = null;
     this._device = null;
     this._recvVideoTransport = null;
@@ -63,6 +94,9 @@ class DuoxIntercomCard extends HTMLElement {
     this._error = null;
     this._videoStream = null;
     this._audioStream = null;
+    this._sheetOpen = false;
+    this._callHistory = null;
+    this._historyLoading = false;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -70,103 +104,248 @@ class DuoxIntercomCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const prev = this._hass;
     this._hass = hass;
+    if (this._wifiEntity && prev) {
+      const oldWifi = prev.states[this._wifiEntity];
+      const newWifi = hass.states[this._wifiEntity];
+      if (oldWifi?.state !== newWifi?.state) {
+        this._updateWifiIcon();
+      }
+    }
+  }
+
+  /* -- CSS --------------------------------------------------------- */
+
+  _css() {
+    return `
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      :host { display: block; }
+      :host::before, :host::after { display: none !important; }
+
+      .card {
+        background: var(--ha-card-background, var(--card-background-color, #fff));
+        border-radius: var(--ha-card-border-radius, 12px);
+        box-shadow: var(--ha-card-box-shadow, 0 2px 6px rgba(0,0,0,.15));
+        overflow: hidden;
+        position: relative;
+        font-family: var(--primary-font-family, Roboto, sans-serif);
+      }
+
+      /* -- Video / snapshot area ----------------------------------- */
+      .video-wrap {
+        position: relative;
+        width: 100%;
+        background: #111;
+        aspect-ratio: 16/9;
+      }
+      .video-wrap video, .video-wrap img {
+        width: 100%; height: 100%; object-fit: contain; display: block;
+      }
+      .snapshot-badge {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: rgba(0,0,0,.55);
+        color: #fff; font-size: 11px; padding: 4px 10px;
+        text-align: center; pointer-events: none;
+        letter-spacing: .3px;
+      }
+
+      /* -- WiFi indicator ------------------------------------------ */
+      .wifi-indicator {
+        position: absolute; top: 8px; right: 8px;
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: rgba(0,0,0,.45);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2;
+      }
+      .wifi-indicator svg { width: 18px; height: 18px; }
+
+      /* -- Controls bar -------------------------------------------- */
+      .controls {
+        display: flex; gap: 10px; padding: 12px 16px;
+        justify-content: center; align-items: center;
+      }
+
+      /* -- Icon buttons (Midea-style circular) --------------------- */
+      .ibtn {
+        width: 44px; height: 44px; border-radius: 50%;
+        border: 2px solid; padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; background: transparent;
+        transition: filter .15s, opacity .15s;
+        flex-shrink: 0;
+        -webkit-user-select: none; user-select: none;
+      }
+      .ibtn:hover { filter: brightness(1.15); }
+      .ibtn:active { filter: brightness(.9); }
+      .ibtn:disabled { opacity: .35; cursor: default; pointer-events: none; }
+      .ibtn svg { width: 22px; height: 22px; pointer-events: none; }
+
+      .ibtn-connect  { border-color: #4CAF50; color: #4CAF50; }
+      .ibtn-talk     { border-color: #2196F3; color: #2196F3; }
+      .ibtn-mute     { border-color: #FF9800; color: #FF9800; }
+      .ibtn-hangup   { border-color: #f44336; color: #f44336; background: #f44336; }
+      .ibtn-hangup svg { color: #fff; }
+      .ibtn-unlock   { border-color: #9C27B0; color: #9C27B0; }
+      .ibtn-history  { border-color: var(--divider-color, #ddd); color: var(--secondary-text-color, #888); }
+
+      /* -- Status bar ---------------------------------------------- */
+      .status {
+        text-align: center; padding: 4px 12px 10px;
+        font-size: 11px; color: var(--secondary-text-color, #888);
+      }
+      .status:empty { display: none; }
+      .status.error { color: #f44336; }
+
+      /* -- Bottom sheet overlay (Midea-style) ---------------------- */
+      .overlay {
+        position: absolute; inset: 0;
+        background: rgba(0,0,0,.4);
+        opacity: 0; pointer-events: none;
+        transition: opacity .25s;
+        z-index: 10;
+      }
+      .overlay.open { opacity: 1; pointer-events: auto; }
+
+      .sheet {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: var(--ha-card-background, var(--card-background-color, #fff));
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 16px rgba(0,0,0,.15);
+        transform: translateY(100%);
+        transition: transform .3s ease;
+        z-index: 11;
+        max-height: 80%;
+        overflow-y: auto;
+      }
+      .sheet.open { transform: translateY(0); }
+
+      .sheet-handle {
+        width: 36px; height: 4px; border-radius: 2px;
+        background: var(--divider-color, #ccc);
+        margin: 10px auto 6px;
+      }
+      .sheet-title {
+        text-align: center; font-size: 14px; font-weight: 600;
+        color: var(--primary-text-color, #333);
+        padding: 0 16px 10px;
+      }
+      .sheet-body { padding: 0 12px 16px; }
+
+      /* -- Call history list ---------------------------------------- */
+      .hist-row {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--divider-color, #eee);
+      }
+      .hist-row:last-child { border-bottom: none; }
+      .hist-ico {
+        width: 32px; height: 32px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      .hist-ico svg { width: 18px; height: 18px; }
+      .hist-ico.picked { background: #E8F5E9; color: #4CAF50; }
+      .hist-ico.missed { background: #FFEBEE; color: #f44336; }
+      .hist-ico.autoon { background: #E3F2FD; color: #2196F3; }
+      .hist-ico.unknown { background: #F5F5F5; color: #888; }
+      .hist-info { flex: 1; min-width: 0; }
+      .hist-name {
+        font-size: 13px; font-weight: 500;
+        color: var(--primary-text-color, #333);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .hist-time {
+        font-size: 11px; color: var(--secondary-text-color, #888);
+      }
+      .hist-empty {
+        text-align: center; padding: 24px 0;
+        font-size: 13px; color: var(--secondary-text-color, #888);
+      }
+      .hist-loading {
+        text-align: center; padding: 24px 0;
+        font-size: 13px; color: var(--secondary-text-color, #888);
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .spinner {
+        display: inline-block; width: 20px; height: 20px;
+        border: 2px solid var(--divider-color, #ccc);
+        border-top-color: var(--primary-text-color, #333);
+        border-radius: 50%;
+        animation: spin .6s linear infinite;
+      }
+    `;
   }
 
   /* -- Render ------------------------------------------------------ */
 
   _render() {
-    const state = this._state;
+    const S = this._state;
     const err = this._error || "";
-    const cameraProxy = this._cameraEntity
-      ? `/api/camera_proxy/${this._cameraEntity}`
-      : "";
+    const cam = this._cameraEntity ? `/api/camera_proxy/${this._cameraEntity}` : "";
+    const wifiState = this._hass?.states?.[this._wifiEntity]?.state || "unknown";
+    const wifiLvl = WIFI_MAP[wifiState] ?? 0;
+    const wifiClr = WIFI_COLORS[wifiState] || "#888";
 
     this.shadowRoot.innerHTML = `
-      <style>
-        :host { display: block; }
-        .card {
-          background: var(--ha-card-background, var(--card-background-color, #fff));
-          border-radius: var(--ha-card-border-radius, 12px);
-          box-shadow: var(--ha-card-box-shadow, 0 2px 6px rgba(0,0,0,.15));
-          overflow: hidden;
-          position: relative;
-        }
-        .video-wrap {
-          position: relative;
-          width: 100%;
-          background: #000;
-          aspect-ratio: 16/9;
-        }
-        .video-wrap video, .video-wrap img {
-          width: 100%; height: 100%; object-fit: contain; display: block;
-        }
-        .controls {
-          display: flex; gap: 8px; padding: 12px; justify-content: center;
-          flex-wrap: wrap;
-        }
-        button {
-          cursor: pointer;
-          border: none; border-radius: 24px;
-          padding: 10px 24px;
-          font-size: 14px; font-weight: 600;
-          color: #fff;
-          transition: opacity .15s;
-        }
-        button:hover { opacity: .85; }
-        button:disabled { opacity: .4; cursor: default; }
-        .btn-connect  { background: #4CAF50; }
-        .btn-talk     { background: #2196F3; }
-        .btn-mute     { background: #FF9800; }
-        .btn-hangup   { background: #f44336; }
-        .btn-unlock   { background: #9C27B0; }
-        .status {
-          text-align: center; padding: 6px 12px;
-          font-size: 12px; color: var(--secondary-text-color, #666);
-        }
-        .status:empty { display: none; }
-        .status.error { color: #f44336; }
-      </style>
-
+      <style>${this._css()}</style>
       <ha-card>
         <div class="card">
+
           <div class="video-wrap" id="vw">
-            ${state === "idle" && cameraProxy
-              ? `<img src="${cameraProxy}" alt="Snapshot"/>`
+            ${S === "idle" && cam
+              ? `<img src="${cam}" alt="Snapshot"/>
+                 <div class="snapshot-badge">Last snapshot</div>`
               : `<video id="vid" autoplay playsinline muted></video>`}
+            ${this._wifiEntity
+              ? `<div class="wifi-indicator" id="wifiIco" style="color:${wifiClr}"
+                      title="WiFi: ${wifiState}">${wifiIcon(wifiLvl)}</div>`
+              : ""}
           </div>
+
           <div class="controls">
-            ${state === "idle"
-              ? `<button class="btn-connect" id="btnConnect">Connect</button>`
-              : ""}
-            ${state === "preview"
-              ? `<button class="btn-talk" id="btnTalk">Talk</button>
-                 <button class="btn-hangup" id="btnHangup">Hang up</button>`
-              : ""}
-            ${state === "call"
-              ? `<button class="btn-mute" id="btnMute">Mute</button>
-                 <button class="btn-hangup" id="btnHangup">Hang up</button>`
-              : ""}
-            ${state === "connecting"
-              ? `<button class="btn-hangup" id="btnHangup">Cancel</button>`
-              : ""}
-            ${this._lockEntity && state !== "connecting"
-              ? `<button class="btn-unlock" id="btnUnlock">\uD83D\uDD11 Open</button>`
+            ${S === "idle" ? `
+              <button class="ibtn ibtn-connect" id="btnConnect" title="Connect">${ICONS.video}</button>
+            ` : ""}
+            ${S === "preview" ? `
+              <button class="ibtn ibtn-talk" id="btnTalk" title="Talk">${ICONS.mic}</button>
+              <button class="ibtn ibtn-hangup" id="btnHangup" title="Hang up">${ICONS.phoneHangup}</button>
+            ` : ""}
+            ${S === "call" ? `
+              <button class="ibtn ibtn-mute" id="btnMute" title="Mute">${ICONS.mic}</button>
+              <button class="ibtn ibtn-hangup" id="btnHangup" title="Hang up">${ICONS.phoneHangup}</button>
+            ` : ""}
+            ${S === "connecting" ? `
+              <button class="ibtn ibtn-hangup" id="btnHangup" title="Cancel">${ICONS.phoneHangup}</button>
+            ` : ""}
+            ${this._lockEntity && S !== "connecting" ? `
+              <button class="ibtn ibtn-unlock" id="btnUnlock" title="Open gate">${ICONS.lockOpen}</button>
+            ` : ""}
+            <button class="ibtn ibtn-history" id="btnHistory" title="Call history">${ICONS.history}</button>
+          </div>
+
+          <div class="status${S === "error" ? " error" : ""}" id="status">
+            ${S === "connecting" ? "Connecting\u2026"
+              : S === "error" ? err
               : ""}
           </div>
-          <div class="status${state === "error" ? " error" : ""}" id="status">
-            ${state === "connecting" ? "Connecting\u2026"
-              : state === "preview" ? "Preview \u2014 press Talk to speak"
-              : state === "call" ? "In call"
-              : state === "error" ? `Error: ${err}`
-              : ""}
+
+          <div class="overlay" id="overlay"></div>
+          <div class="sheet" id="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Call History</div>
+            <div class="sheet-body" id="sheetBody"></div>
           </div>
+
         </div>
       </ha-card>
     `;
 
     this._bindButtons();
     this._attachStreams();
+    if (this._sheetOpen) this._renderSheet();
   }
 
   _attachStreams() {
@@ -177,6 +356,15 @@ class DuoxIntercomCard extends HTMLElement {
     }
   }
 
+  _updateWifiIcon() {
+    const el = this.shadowRoot?.getElementById("wifiIco");
+    if (!el) return;
+    const s = this._hass?.states?.[this._wifiEntity]?.state || "unknown";
+    el.style.color = WIFI_COLORS[s] || "#888";
+    el.title = `WiFi: ${s}`;
+    el.innerHTML = wifiIcon(WIFI_MAP[s] ?? 0);
+  }
+
   _bindButtons() {
     const $ = (id) => this.shadowRoot.getElementById(id);
     $("btnConnect")?.addEventListener("click", () => this._connect());
@@ -184,12 +372,114 @@ class DuoxIntercomCard extends HTMLElement {
     $("btnMute")?.addEventListener("click", () => this._toggleMute());
     $("btnHangup")?.addEventListener("click", () => this._hangup());
     $("btnUnlock")?.addEventListener("click", () => this._unlock());
+    $("btnHistory")?.addEventListener("click", () => this._openSheet());
+    $("overlay")?.addEventListener("click", () => this._closeSheet());
   }
 
   _setState(s, err) {
     this._state = s;
     this._error = err || null;
     this._render();
+  }
+
+  /* -- Bottom sheet ------------------------------------------------ */
+
+  async _openSheet() {
+    this._sheetOpen = true;
+    this._historyLoading = true;
+    this._callHistory = null;
+
+    const ov = this.shadowRoot.getElementById("overlay");
+    const sh = this.shadowRoot.getElementById("sheet");
+    if (ov) ov.classList.add("open");
+    if (sh) sh.classList.add("open");
+    this._renderSheetContent();
+
+    try {
+      const result = await this._hass.callWS({
+        type: "duox/call_history",
+        entry_id: this._entryId,
+      });
+      this._callHistory = result || [];
+    } catch (e) {
+      console.error("[duox-intercom] call_history error:", e);
+      this._callHistory = [];
+    }
+    this._historyLoading = false;
+    this._renderSheetContent();
+  }
+
+  _closeSheet() {
+    this._sheetOpen = false;
+    const ov = this.shadowRoot.getElementById("overlay");
+    const sh = this.shadowRoot.getElementById("sheet");
+    if (ov) ov.classList.remove("open");
+    if (sh) sh.classList.remove("open");
+  }
+
+  _renderSheet() {
+    const ov = this.shadowRoot.getElementById("overlay");
+    const sh = this.shadowRoot.getElementById("sheet");
+    if (ov) ov.classList.add("open");
+    if (sh) sh.classList.add("open");
+    this._renderSheetContent();
+  }
+
+  _renderSheetContent() {
+    const body = this.shadowRoot.getElementById("sheetBody");
+    if (!body) return;
+
+    if (this._historyLoading) {
+      body.innerHTML = `<div class="hist-loading"><div class="spinner"></div></div>`;
+      return;
+    }
+
+    const items = this._callHistory;
+    if (!items || items.length === 0) {
+      body.innerHTML = `<div class="hist-empty">No call history</div>`;
+      return;
+    }
+
+    body.innerHTML = items.map(e => {
+      const state = (e.registerCall || "U").toUpperCase();
+      const isAutoon = e.isAutoon === true || e.isAutoon === "true";
+      let cssClass, icon;
+      if (isAutoon) {
+        cssClass = "autoon";
+        icon = ICONS.autoOn;
+      } else if (state === "P") {
+        cssClass = "picked";
+        icon = ICONS.phoneIn;
+      } else if (state === "M") {
+        cssClass = "missed";
+        icon = ICONS.phoneMissed;
+      } else {
+        cssClass = "unknown";
+        icon = ICONS.phoneIn;
+      }
+      const name = e.name || e.deviceId || "Unknown";
+      const ts = e.callDate ? this._fmtTime(e.callDate) : "";
+      return `<div class="hist-row">
+        <div class="hist-ico ${cssClass}">${icon}</div>
+        <div class="hist-info">
+          <div class="hist-name">${name}</div>
+          <div class="hist-time">${ts}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  _fmtTime(timestamp) {
+    try {
+      const d = new Date(typeof timestamp === "number" ? timestamp : parseInt(timestamp, 10));
+      const now = Date.now();
+      const diff = now - d.getTime();
+      if (diff < 60000) return "Just now";
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    } catch (_) { return ""; }
   }
 
   /* -- Connect flow ------------------------------------------------ */
@@ -270,22 +560,18 @@ class DuoxIntercomCard extends HTMLElement {
 
       const iceServers = r.iceServers ? safeParse(r.iceServers) : undefined;
 
-      /* Receive-video transport */
       this._recvVideoTransport = this._createRecvTransport(
         device, r.recvTransportVideo, iceServers
       );
 
-      /* Receive-audio transport */
       this._recvAudioTransport = this._createRecvTransport(
         device, r.recvTransportAudio, iceServers
       );
 
-      /* Send transport (for mic later) */
       this._sendTransport = this._createSendTransport(
         device, r.sendTransport, iceServers
       );
 
-      /* Consume video only — audio is consumed after pickup (matching native app) */
       if (r.producerIdVideo) {
         await this._consumeTrack(
           this._recvVideoTransport, r.producerIdVideo, "video"
@@ -314,14 +600,13 @@ class DuoxIntercomCard extends HTMLElement {
 
   _toggleMute() {
     if (!this._micProducer) return;
+    const btn = this.shadowRoot.getElementById("btnMute");
     if (this._micProducer.paused) {
       this._micProducer.resume();
-      const btn = this.shadowRoot.getElementById("btnMute");
-      if (btn) btn.textContent = "Mute";
+      if (btn) { btn.innerHTML = ICONS.mic; btn.title = "Mute"; btn.classList.remove("ibtn-mute-active"); }
     } else {
       this._micProducer.pause();
-      const btn = this.shadowRoot.getElementById("btnMute");
-      if (btn) btn.textContent = "Unmute";
+      if (btn) { btn.innerHTML = ICONS.micOff; btn.title = "Unmute"; btn.classList.add("ibtn-mute-active"); }
     }
   }
 
@@ -525,7 +810,7 @@ class DuoxIntercomCard extends HTMLElement {
   /* -- Card editor helpers ----------------------------------------- */
 
   static getStubConfig() {
-    return { entry_id: "", camera_entity: "", lock_entity: "" };
+    return { entry_id: "", camera_entity: "", lock_entity: "", wifi_entity: "" };
   }
 
   getCardSize() {

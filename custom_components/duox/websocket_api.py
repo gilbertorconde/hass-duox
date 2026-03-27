@@ -19,6 +19,7 @@ async def async_register_ws_api(hass: HomeAssistant) -> None:
     """Register WebSocket commands."""
     websocket_api.async_register_command(hass, ws_get_active_call)
     websocket_api.async_register_command(hass, ws_autoon)
+    websocket_api.async_register_command(hass, ws_call_history)
 
 
 @websocket_api.websocket_command(
@@ -156,3 +157,42 @@ async def ws_autoon(
     connection.send_error(
         msg["id"], "timeout", "No call data received within 30 seconds"
     )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "duox/call_history",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_call_history(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Fetch call registry history from the Fermax API."""
+    entry_id = msg["entry_id"]
+    data = hass.data.get(DOMAIN, {}).get(entry_id)
+
+    if not data:
+        connection.send_error(msg["id"], "not_found", "Integration entry not found")
+        return
+
+    client = data.get("client")
+    gcm_token = data.get("gcm_token", "")
+
+    if not gcm_token:
+        connection.send_error(
+            msg["id"],
+            "no_gcm_token",
+            "GCM push token not available",
+        )
+        return
+
+    try:
+        entries = await client.async_get_call_registry(gcm_token)
+        connection.send_result(msg["id"], entries)
+    except Exception as err:
+        LOGGER.error("call_history fetch failed: %s", err)
+        connection.send_error(msg["id"], "fetch_failed", str(err))

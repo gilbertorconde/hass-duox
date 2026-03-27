@@ -42,7 +42,7 @@ class DuoxF1Button(ButtonEntity):
         self._device_id = device_id
         self._model = device_info.model
         self._attr_unique_id = f"{device_id}_f1_button".lower()
-        self._attr_name = "F1"
+        self._attr_name = "Duox F1"
 
     async def async_press(self) -> None:
         await self._client.async_f1(self._device_id)
