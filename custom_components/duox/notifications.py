@@ -182,6 +182,29 @@ async def _android_gcm_register(
     return None
 
 
+class AndroidFcmPushClient(FcmPushClient):
+    """FcmPushClient that handles unencrypted Android-style FCM messages.
+
+    The base class assumes web-push encryption (``crypto-key`` header).
+    Android GCM registrations receive plain-text data messages where the
+    notification payload lives directly in the protobuf ``app_data`` field.
+    """
+
+    def _handle_data_message(self, msg: Any) -> None:
+        try:
+            self._app_data_by_key(msg, "crypto-key")
+        except RuntimeError:
+            notification: dict[str, str] = {}
+            for item in msg.app_data:
+                notification[item.key] = item.value
+            persistent_id: str = msg.persistent_id
+            LOGGER.debug("Android FCM data message: %s", notification)
+            self.callback(notification, persistent_id, None)
+            return
+
+        super()._handle_data_message(msg)
+
+
 class FermaxNotificationListener:
     """Listens for Fermax doorbell push notifications via FCM."""
 
@@ -205,7 +228,13 @@ class FermaxNotificationListener:
 
     async def async_start(self) -> None:
         """Register with FCM and start listening for notifications."""
-        credentials = await self._store.async_load()
+        try:
+            credentials = await self._store.async_load()
+        except NotImplementedError:
+            LOGGER.warning(
+                "Stored FCM credentials are from an older version, re-registering"
+            )
+            credentials = None
 
         if not credentials:
             LOGGER.info("No FCM credentials — performing Android registration")
@@ -226,7 +255,7 @@ class FermaxNotificationListener:
             FCM_SENDER_ID,
         )
 
-        self._push_client = FcmPushClient(
+        self._push_client = AndroidFcmPushClient(
             self._on_notification,
             fcm_config,
             credentials,
