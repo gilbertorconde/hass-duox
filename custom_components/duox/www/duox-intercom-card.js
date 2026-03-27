@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.2.1";
+const CARD_VERSION = "0.3.0";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -99,7 +99,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._sheetOpen = false;
     this._callHistory = null;
     this._historyLoading = false;
-    this._photoPreview = null;
+    this._thumbCache = {};
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -117,6 +117,7 @@ class DuoxIntercomCard extends HTMLElement {
         window.history.replaceState(null, "", url.toString());
         setTimeout(() => this._connect(), 500);
       }
+      setTimeout(() => this._loadHistory(), 100);
     }
 
     if (this._wifiEntity && prev) {
@@ -215,7 +216,6 @@ class DuoxIntercomCard extends HTMLElement {
       .ibtn-hangup   { border-color: #f44336; color: #f44336; background: #f44336; }
       .ibtn-hangup svg { color: #fff; }
       .ibtn-unlock   { border-color: #9C27B0; color: #9C27B0; }
-      .ibtn-history  { border-color: var(--divider-color, #ddd); color: var(--secondary-text-color, #888); }
 
       /* -- Status bar ---------------------------------------------- */
       .status {
@@ -225,42 +225,25 @@ class DuoxIntercomCard extends HTMLElement {
       .status:empty { display: none; }
       .status.error { color: #f44336; }
 
-      /* -- Bottom sheet overlay (Midea-style) ---------------------- */
-      .overlay {
-        position: absolute; inset: 0;
-        background: rgba(0,0,0,.4);
-        opacity: 0; pointer-events: none;
-        transition: opacity .25s;
-        z-index: 10;
+      /* -- Call history (inline) ------------------------------------ */
+      .call-history {
+        border-top: 1px solid var(--divider-color, #eee);
       }
-      .overlay.open { opacity: 1; pointer-events: auto; }
-
-      .sheet {
-        position: absolute; bottom: 0; left: 0; right: 0;
-        background: var(--ha-card-background, var(--card-background-color, #fff));
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -4px 16px rgba(0,0,0,.15);
-        transform: translateY(100%);
-        transition: transform .3s ease;
-        z-index: 11;
-        max-height: 80%;
-        overflow-y: auto;
-      }
-      .sheet.open { transform: translateY(0); }
-
-      .sheet-handle {
-        width: 36px; height: 4px; border-radius: 2px;
-        background: var(--divider-color, #ccc);
-        margin: 10px auto 6px;
-      }
-      .sheet-title {
-        text-align: center; font-size: 14px; font-weight: 600;
+      .hist-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 16px 6px;
+        font-size: 13px; font-weight: 600;
         color: var(--primary-text-color, #333);
-        padding: 0 16px 10px;
       }
-      .sheet-body { padding: 0 12px 16px; }
-
-      /* -- Call history list ---------------------------------------- */
+      .hist-header .hist-refresh {
+        background: none; border: none; cursor: pointer; padding: 4px;
+        color: var(--secondary-text-color, #888);
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; transition: background .15s;
+      }
+      .hist-header .hist-refresh:hover { background: var(--secondary-background-color, rgba(0,0,0,.04)); }
+      .hist-header .hist-refresh svg { width: 18px; height: 18px; }
+      .hist-list { padding: 0 12px 12px; }
       .hist-row {
         display: flex; align-items: center; gap: 10px;
         padding: 8px 4px;
@@ -289,13 +272,38 @@ class DuoxIntercomCard extends HTMLElement {
       .hist-time {
         font-size: 11px; color: var(--secondary-text-color, #888);
       }
-      .hist-empty {
+      .hist-thumb {
+        width: 48px; height: 36px; border-radius: 4px;
+        object-fit: cover; flex-shrink: 0;
+        background: var(--secondary-background-color, #f0f0f0);
+      }
+      .hist-thumb-placeholder {
+        width: 48px; height: 36px; border-radius: 4px; flex-shrink: 0;
+        background: var(--secondary-background-color, #f0f0f0);
+      }
+      .hist-empty, .hist-loading {
         text-align: center; padding: 24px 0;
         font-size: 13px; color: var(--secondary-text-color, #888);
       }
-      .hist-loading {
-        text-align: center; padding: 24px 0;
-        font-size: 13px; color: var(--secondary-text-color, #888);
+
+      /* -- Photo viewer overlay ------------------------------------- */
+      .photo-viewer {
+        position: absolute; inset: 0; z-index: 10;
+        background: rgba(0,0,0,.85);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        cursor: pointer;
+      }
+      .photo-viewer img {
+        max-width: 100%; max-height: 90%;
+        object-fit: contain; border-radius: 4px;
+      }
+      .photo-viewer .pv-close {
+        position: absolute; top: 8px; right: 8px;
+        color: #fff; background: rgba(255,255,255,.15);
+        border: none; border-radius: 50%; width: 32px; height: 32px;
+        font-size: 18px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
       }
 
       @keyframes spin { to { transform: rotate(360deg); } }
@@ -306,26 +314,6 @@ class DuoxIntercomCard extends HTMLElement {
         border-radius: 50%;
         animation: spin .6s linear infinite;
       }
-
-      /* -- Photo preview inside sheet ------------------------------ */
-      .photo-preview {
-        padding: 8px 0;
-        text-align: center;
-      }
-      .photo-preview img {
-        max-width: 100%; border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,.15);
-      }
-      .photo-preview .photo-back {
-        display: inline-block; margin-top: 8px;
-        font-size: 12px; color: var(--primary-color, #2196F3);
-        cursor: pointer; padding: 4px 12px;
-        border-radius: 12px; border: 1px solid var(--primary-color, #2196F3);
-        background: transparent;
-        font-family: inherit;
-      }
-      .photo-preview .photo-back:hover { background: rgba(33,150,243,.08); }
-      .photo-loading { text-align: center; padding: 24px 0; }
     `;
   }
 
@@ -374,7 +362,6 @@ class DuoxIntercomCard extends HTMLElement {
             ${this._lockEntity && S !== "connecting" ? `
               <button class="ibtn ibtn-unlock" id="btnUnlock" title="Open gate">${ICONS.lockOpen}</button>
             ` : ""}
-            <button class="ibtn ibtn-history" id="btnHistory" title="Call history">${ICONS.history}</button>
           </div>
 
           <div class="status${S === "error" ? " error" : ""}" id="status">
@@ -383,11 +370,12 @@ class DuoxIntercomCard extends HTMLElement {
               : ""}
           </div>
 
-          <div class="overlay" id="overlay"></div>
-          <div class="sheet" id="sheet">
-            <div class="sheet-handle"></div>
-            <div class="sheet-title">Call History</div>
-            <div class="sheet-body" id="sheetBody"></div>
+          <div class="call-history">
+            <div class="hist-header">
+              <span>Call History</span>
+              <button class="hist-refresh" id="btnRefreshHist" title="Refresh">${ICONS.history}</button>
+            </div>
+            <div class="hist-list" id="histList"></div>
           </div>
 
         </div>
@@ -396,7 +384,7 @@ class DuoxIntercomCard extends HTMLElement {
 
     this._bindButtons();
     this._attachStreams();
-    if (this._sheetOpen) this._renderSheet();
+    this._renderHistory();
   }
 
   _attachStreams() {
@@ -423,8 +411,7 @@ class DuoxIntercomCard extends HTMLElement {
     $("btnMute")?.addEventListener("click", () => this._toggleMute());
     $("btnHangup")?.addEventListener("click", () => this._hangup());
     $("btnUnlock")?.addEventListener("click", () => this._unlock());
-    $("btnHistory")?.addEventListener("click", () => this._openSheet());
-    $("overlay")?.addEventListener("click", () => this._closeSheet());
+    $("btnRefreshHist")?.addEventListener("click", () => this._loadHistory());
   }
 
   _setState(s, err) {
@@ -433,19 +420,12 @@ class DuoxIntercomCard extends HTMLElement {
     this._render();
   }
 
-  /* -- Bottom sheet ------------------------------------------------ */
+  /* -- Inline call history ----------------------------------------- */
 
-  async _openSheet() {
-    this._sheetOpen = true;
+  async _loadHistory() {
     this._historyLoading = true;
     this._callHistory = null;
-    this._photoPreview = null;
-
-    const ov = this.shadowRoot.getElementById("overlay");
-    const sh = this.shadowRoot.getElementById("sheet");
-    if (ov) ov.classList.add("open");
-    if (sh) sh.classList.add("open");
-    this._renderSheetContent();
+    this._renderHistory();
 
     try {
       const result = await this._hass.callWS({
@@ -458,55 +438,29 @@ class DuoxIntercomCard extends HTMLElement {
       this._callHistory = [];
     }
     this._historyLoading = false;
-    this._renderSheetContent();
+    this._renderHistory();
+    this._loadThumbnails();
   }
 
-  _closeSheet() {
-    this._sheetOpen = false;
-    const ov = this.shadowRoot.getElementById("overlay");
-    const sh = this.shadowRoot.getElementById("sheet");
-    if (ov) ov.classList.remove("open");
-    if (sh) sh.classList.remove("open");
-  }
-
-  _renderSheet() {
-    const ov = this.shadowRoot.getElementById("overlay");
-    const sh = this.shadowRoot.getElementById("sheet");
-    if (ov) ov.classList.add("open");
-    if (sh) sh.classList.add("open");
-    this._renderSheetContent();
-  }
-
-  _renderSheetContent() {
-    const body = this.shadowRoot.getElementById("sheetBody");
-    if (!body) return;
-
-    if (this._photoPreview) {
-      body.innerHTML = `<div class="photo-preview">
-        ${this._photoPreview === "loading"
-          ? `<div class="photo-loading"><div class="spinner"></div></div>`
-          : `<img src="data:image/jpeg;base64,${this._photoPreview}" alt="Call snapshot"/>
-             <div><button class="photo-back" id="photoBack">Back to list</button></div>`}
-      </div>`;
-      body.querySelector("#photoBack")?.addEventListener("click", () => {
-        this._photoPreview = null;
-        this._renderSheetContent();
-      });
-      return;
-    }
+  _renderHistory() {
+    const list = this.shadowRoot.getElementById("histList");
+    if (!list) return;
 
     if (this._historyLoading) {
-      body.innerHTML = `<div class="hist-loading"><div class="spinner"></div></div>`;
+      list.innerHTML = `<div class="hist-loading"><div class="spinner"></div></div>`;
       return;
     }
 
     const items = this._callHistory;
     if (!items || items.length === 0) {
-      body.innerHTML = `<div class="hist-empty">No call history</div>`;
+      list.innerHTML = items === null
+        ? `<div class="hist-empty" style="cursor:pointer" id="histLoadPrompt">Tap to load</div>`
+        : `<div class="hist-empty">No call history</div>`;
+      list.querySelector("#histLoadPrompt")?.addEventListener("click", () => this._loadHistory());
       return;
     }
 
-    body.innerHTML = items.map((e, i) => {
+    list.innerHTML = items.map((e, i) => {
       const state = (e.registerCall || "U").toUpperCase();
       const isAutoon = e.isAutoon === true || e.isAutoon === "true";
       let cssClass, icon;
@@ -530,35 +484,96 @@ class DuoxIntercomCard extends HTMLElement {
         <div class="hist-ico ${cssClass}">${icon}</div>
         <div class="hist-info">
           <div class="hist-name">${name}</div>
-          <div class="hist-time">${ts}${hasPhoto ? " \u00b7 tap for photo" : ""}</div>
+          <div class="hist-time">${ts}</div>
         </div>
+        ${hasPhoto
+          ? `<div class="hist-thumb-placeholder" data-thumb="${e.photoId}"></div>`
+          : ""}
       </div>`;
     }).join("");
 
-    body.querySelectorAll(".hist-row[data-photo]").forEach(row => {
+    list.querySelectorAll(".hist-row[data-photo]").forEach(row => {
       row.addEventListener("click", () => {
         const photoId = row.getAttribute("data-photo");
-        if (photoId) this._loadCallPhoto(photoId);
+        if (photoId) this._showPhoto(photoId);
       });
     });
   }
 
-  async _loadCallPhoto(photoId) {
-    this._photoPreview = "loading";
-    this._renderSheetContent();
-    try {
-      const result = await this._hass.callWS({
-        type: "duox/call_photo",
-        entry_id: this._entryId,
-        photo_id: photoId,
-      });
-      this._photoPreview = result?.image_b64 || null;
-      if (!this._photoPreview) this._photoPreview = null;
-    } catch (e) {
-      console.error("[duox-intercom] call_photo error:", e);
-      this._photoPreview = null;
+  async _loadThumbnails() {
+    const items = this._callHistory;
+    if (!items) return;
+    const seen = this._thumbCache || {};
+    this._thumbCache = seen;
+
+    for (const entry of items) {
+      if (!entry.photoId || seen[entry.photoId]) {
+        if (seen[entry.photoId]) this._setThumb(entry.photoId, seen[entry.photoId]);
+        continue;
+      }
+      try {
+        const result = await this._hass.callWS({
+          type: "duox/call_photo",
+          entry_id: this._entryId,
+          photo_id: entry.photoId,
+        });
+        if (result?.image_b64) {
+          const src = `data:image/jpeg;base64,${result.image_b64}`;
+          seen[entry.photoId] = src;
+          this._setThumb(entry.photoId, src);
+        }
+      } catch (_) {}
     }
-    this._renderSheetContent();
+  }
+
+  _setThumb(photoId, src) {
+    const el = this.shadowRoot?.querySelector(`[data-thumb="${photoId}"]`);
+    if (el && el.tagName !== "IMG") {
+      const img = document.createElement("img");
+      img.className = "hist-thumb";
+      img.src = src;
+      img.alt = "";
+      el.replaceWith(img);
+      img.dataset.thumb = photoId;
+    }
+  }
+
+  async _showPhoto(photoId) {
+    const cached = this._thumbCache?.[photoId];
+    const vw = this.shadowRoot.getElementById("vw");
+    if (!vw) return;
+
+    const viewer = document.createElement("div");
+    viewer.className = "photo-viewer";
+    viewer.innerHTML = `<button class="pv-close">\u00d7</button>${
+      cached
+        ? `<img src="${cached}" alt="Call photo"/>`
+        : `<div class="spinner"></div>`
+    }`;
+    vw.appendChild(viewer);
+
+    viewer.addEventListener("click", () => viewer.remove());
+
+    if (!cached) {
+      try {
+        const result = await this._hass.callWS({
+          type: "duox/call_photo",
+          entry_id: this._entryId,
+          photo_id: photoId,
+        });
+        if (result?.image_b64) {
+          const src = `data:image/jpeg;base64,${result.image_b64}`;
+          this._thumbCache = this._thumbCache || {};
+          this._thumbCache[photoId] = src;
+          viewer.innerHTML = `<button class="pv-close">\u00d7</button><img src="${src}" alt="Call photo"/>`;
+          viewer.addEventListener("click", () => viewer.remove());
+        } else {
+          viewer.remove();
+        }
+      } catch (_) {
+        viewer.remove();
+      }
+    }
   }
 
   _fmtTime(timestamp) {
@@ -917,7 +932,7 @@ class DuoxIntercomCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 5;
+    return 8;
   }
 }
 
