@@ -376,7 +376,7 @@ class FermaxNotificationListener:
             LOGGER.debug("Ignoring non-Fermax notification: %s", notification)
             return
 
-        if notif_type == "Call":
+        if notif_type in ("Call", "Autoon"):
             LOGGER.info(
                 "Incoming call — raw FCM data: %s", notification
             )
