@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 
+from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform
@@ -91,6 +92,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     f"/{DOMAIN}/www", www_path, False
                 )
             ])
+            add_extra_js_url(hass, f"/{DOMAIN}/www/duox-intercom-card.js")
             hass.data[DOMAIN]["_www_registered"] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
