@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 
-from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components import frontend
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform
@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN
+from .const import CARD_BASE_URL, CARD_URL, DOMAIN
 from .coordinator import FermaxCoordinator
 from .fermax_api import FermaxAuthError, FermaxClient
 
@@ -92,7 +92,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     f"/{DOMAIN}/www", www_path, False
                 )
             ])
-            add_extra_js_url(hass, f"/{DOMAIN}/www/duox-intercom-card.js")
+            await _register_card_resource(hass, CARD_BASE_URL, CARD_URL)
             hass.data[DOMAIN]["_www_registered"] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -146,4 +146,72 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+        remaining = {k for k in hass.data[DOMAIN] if not k.startswith("_")}
+        if not remaining:
+            await _unregister_card_resource(hass, CARD_URL)
     return unload_ok
+
+
+async def _register_card_resource(
+    hass: HomeAssistant,
+    base_url: str,
+    card_url: str,
+) -> None:
+    """Register a card JS file as a Lovelace resource.
+
+    Falls back to add_extra_js_url if Lovelace resources are unavailable.
+    """
+    try:
+        lovelace_data = hass.data.get("lovelace")
+        if lovelace_data and hasattr(lovelace_data, "resources"):
+            resources = lovelace_data.resources
+            if hasattr(resources, "async_create_item"):
+                if not resources.loaded:
+                    await resources.async_load()
+                    resources.loaded = True
+                for item in resources.async_items():
+                    url = item.get("url", "")
+                    if url == card_url:
+                        return
+                    if url.startswith(base_url):
+                        await resources.async_update_item(
+                            item["id"], {"url": card_url}
+                        )
+                        hass.data.setdefault(DOMAIN, {})["card_resource_id"] = item["id"]
+                        return
+                item = await resources.async_create_item(
+                    {"res_type": "module", "url": card_url}
+                )
+                hass.data.setdefault(DOMAIN, {})["card_resource_id"] = item["id"]
+                return
+    except Exception:  # pylint: disable=broad-exception-caught
+        LOGGER.debug(
+            "Could not register %s as Lovelace resource, falling back to add_extra_js_url",
+            base_url,
+        )
+    try:
+        frontend.add_extra_js_url(hass, card_url)
+    except Exception:  # pylint: disable=broad-exception-caught
+        LOGGER.debug("Could not register %s via add_extra_js_url", base_url)
+
+
+async def _unregister_card_resource(
+    hass: HomeAssistant,
+    card_url: str,
+) -> None:
+    """Remove a card Lovelace resource on unload."""
+    resource_id = hass.data.get(DOMAIN, {}).get("card_resource_id")
+    if not resource_id:
+        try:
+            frontend.remove_extra_js_url(hass, card_url)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        return
+    try:
+        lovelace_data = hass.data.get("lovelace")
+        if lovelace_data and hasattr(lovelace_data, "resources"):
+            resources = lovelace_data.resources
+            if hasattr(resources, "async_delete_item"):
+                await resources.async_delete_item(resource_id)
+    except Exception:  # pylint: disable=broad-exception-caught
+        LOGGER.debug("Could not remove Lovelace resource %s", resource_id)

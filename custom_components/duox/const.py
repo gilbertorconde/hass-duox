@@ -17,5 +17,8 @@ SIGNAL_CALL_ENDED = "{}_call_ended"
 
 SIGNALING_SERVER_URL = "http://signaling-pro-duoxme.fermax.io"
 
+CARD_BASE_URL = "/duox/www/duox-intercom-card.js"
+CARD_URL = f"{CARD_BASE_URL}?v={HASS_DUOX_VERSION}"
+
 DEFAULT_PREVIEW_TIMEOUT = 29
 DEFAULT_CONVERSATION_TIMEOUT = 90
