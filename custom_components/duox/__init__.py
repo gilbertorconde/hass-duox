@@ -85,7 +85,8 @@ async def _start_fcm_listener(
     try:
         from .notifications import FermaxNotificationListener  # noqa: E402
 
-        listener = FermaxNotificationListener(hass, client, entry.entry_id)
+        session = async_get_clientsession(hass)
+        listener = FermaxNotificationListener(hass, client, entry.entry_id, session)
         await listener.async_start()
         hass.data[DOMAIN][entry.entry_id]["notification_listener"] = listener
 
