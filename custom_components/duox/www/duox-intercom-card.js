@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.7";
+const CARD_VERSION = "0.1.8";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -61,6 +61,8 @@ class DuoxIntercomCard extends HTMLElement {
     this._callData = null;
     this._callAudioConsumer = null;
     this._error = null;
+    this._videoStream = null;
+    this._audioStream = null;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -164,6 +166,15 @@ class DuoxIntercomCard extends HTMLElement {
     `;
 
     this._bindButtons();
+    this._attachStreams();
+  }
+
+  _attachStreams() {
+    const vid = this.shadowRoot.getElementById("vid");
+    if (vid && this._videoStream) {
+      vid.srcObject = this._videoStream;
+      vid.play().catch(() => {});
+    }
   }
 
   _bindButtons() {
@@ -358,6 +369,8 @@ class DuoxIntercomCard extends HTMLElement {
     this._audioConsumer = null;
     this._callAudioConsumer = null;
     this._micProducer = null;
+    this._videoStream = null;
+    this._audioStream = null;
   }
 
   /* -- Transport helpers ------------------------------------------- */
@@ -449,10 +462,10 @@ class DuoxIntercomCard extends HTMLElement {
 
     if (kind === "video") {
       this._videoConsumer = consumer;
+      this._videoStream = new MediaStream([consumer.track]);
       const vid = this.shadowRoot.getElementById("vid");
       if (vid) {
-        vid.srcObject = new MediaStream([consumer.track]);
-        vid.muted = true;
+        vid.srcObject = this._videoStream;
         vid.play().catch(() => {});
       }
     } else {
@@ -461,8 +474,9 @@ class DuoxIntercomCard extends HTMLElement {
       } else {
         this._audioConsumer = consumer;
       }
+      this._audioStream = new MediaStream([consumer.track]);
       const audio = new Audio();
-      audio.srcObject = new MediaStream([consumer.track]);
+      audio.srcObject = this._audioStream;
       audio.play().catch(() => {});
     }
   }
