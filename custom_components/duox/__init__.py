@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import HomeAssistant
@@ -85,9 +86,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data[DOMAIN].get("_www_registered"):
         www_path = os.path.join(os.path.dirname(__file__), "www")
         if os.path.isdir(www_path):
-            hass.http.register_static_path(
-                f"/{DOMAIN}/www", www_path, cache_headers=False
-            )
+            await hass.http.async_register_static_paths([
+                StaticPathConfig(
+                    f"/{DOMAIN}/www", www_path, False
+                )
+            ])
             hass.data[DOMAIN]["_www_registered"] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
