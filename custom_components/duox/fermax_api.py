@@ -336,6 +336,10 @@ class FermaxClient:
         raw = await self._async_request("GET", url)
         return [Pairing.from_dict(p) for p in raw]
 
+    async def async_get_pairings_raw(self) -> list[dict[str, Any]]:
+        url = f"{BASE_URL}/pairing/api/v3/pairings/me"
+        return await self._async_request("GET", url)
+
     async def async_get_device_info(self, device_id: str) -> DeviceInfo:
         url = f"{BASE_URL}/deviceaction/api/v1/device/{device_id}"
         raw = await self._async_request("GET", url)

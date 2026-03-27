@@ -93,10 +93,32 @@ async def ws_autoon(
         connection.send_error(msg["id"], "no_device", "Device info not found")
         return
 
-    directed_to = f"{info.installation_id}/{pairing.id}"
     LOGGER.debug(
-        "autoon: device_id=%s directed_to=%s", pairing.device_id, directed_to
+        "autoon debug: pairing.id=%s device_id=%s installation_id=%s "
+        "access_doors=%s",
+        pairing.id,
+        pairing.device_id,
+        info.installation_id if info else "N/A",
+        [(d.name, d.title, d.access_id.to_dict()) for d in pairing.access_doors],
     )
+
+    door_names = [d.name for d in pairing.access_doors if d.visible]
+    if len(door_names) >= 2:
+        directed_to = f"{door_names[0]}/{door_names[1]}"
+    elif len(door_names) == 1:
+        directed_to = f"{pairing.device_id}/{door_names[0]}"
+    elif info.installation_id:
+        directed_to = f"{info.installation_id}/{pairing.id}"
+    else:
+        directed_to = f"{pairing.device_id}/{pairing.id}"
+
+    LOGGER.debug("autoon: directed_to=%s", directed_to)
+
+    try:
+        raw_pairings = await client.async_get_pairings_raw()
+        LOGGER.debug("autoon raw pairings: %s", raw_pairings)
+    except Exception:
+        LOGGER.debug("Could not fetch raw pairings for debug")
 
     try:
         data["active_call"] = None
