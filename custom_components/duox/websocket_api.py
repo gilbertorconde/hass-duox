@@ -1,6 +1,8 @@
 """WebSocket API for Fermax Duox — exposes call info to the frontend."""
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -10,10 +12,13 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
 
+LOGGER = logging.getLogger(__name__)
+
 
 async def async_register_ws_api(hass: HomeAssistant) -> None:
     """Register WebSocket commands."""
     websocket_api.async_register_command(hass, ws_get_active_call)
+    websocket_api.async_register_command(hass, ws_autoon)
 
 
 @websocket_api.websocket_command(
@@ -52,3 +57,70 @@ def ws_get_active_call(
         "gcm_token": data.get("gcm_token", ""),
     }
     connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "duox/autoon",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_autoon(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Trigger an outbound monitor call, then wait for FCM to deliver call data."""
+    entry_id = msg["entry_id"]
+    data = hass.data.get(DOMAIN, {}).get(entry_id)
+
+    if not data:
+        connection.send_error(msg["id"], "not_found", "Integration entry not found")
+        return
+
+    client = data.get("client")
+    pairings = data.get("pairings", [])
+    device_info = data.get("device_info", {})
+
+    if not pairings:
+        connection.send_error(msg["id"], "no_pairing", "No pairings available")
+        return
+
+    pairing = pairings[0]
+    info = device_info.get(pairing.device_id)
+    if not info:
+        connection.send_error(msg["id"], "no_device", "Device info not found")
+        return
+
+    directed_to = f"{info.installation_id}/{pairing.id}"
+    LOGGER.debug(
+        "autoon: device_id=%s directed_to=%s", pairing.device_id, directed_to
+    )
+
+    try:
+        data["active_call"] = None
+        await client.async_autoon(pairing.device_id, directed_to)
+    except Exception as err:
+        LOGGER.error("autoon API call failed: %s", err)
+        connection.send_error(msg["id"], "autoon_failed", str(err))
+        return
+
+    for _ in range(30):
+        await asyncio.sleep(1)
+        active_call = data.get("active_call")
+        if active_call:
+            oauth_token = ""
+            if client and client._token_data:
+                oauth_token = client._token_data.get("access_token", "")
+            result = {
+                **active_call,
+                "oauth_token": oauth_token,
+                "gcm_token": data.get("gcm_token", ""),
+            }
+            connection.send_result(msg["id"], result)
+            return
+
+    connection.send_error(
+        msg["id"], "timeout", "No call data received within 30 seconds"
+    )

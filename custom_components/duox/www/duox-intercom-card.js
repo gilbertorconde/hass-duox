@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.2";
+const CARD_VERSION = "0.1.3";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -183,12 +183,31 @@ class DuoxIntercomCard extends HTMLElement {
 
       await loadDeps();
 
-      const callInfo = await this._getActiveCall();
+      let callInfo = await this._getActiveCall();
+
       if (!callInfo) {
-        this._setState("error", "No active call");
+        console.debug("[duox-intercom] No active call, triggering autoon...");
+        callInfo = await this._triggerAutoon();
+      }
+
+      if (!callInfo) {
+        this._setState("error", "Could not start call");
         return;
       }
+
       this._callData = callInfo;
+      console.debug("[duox-intercom] call info:", callInfo);
+
+      await this._joinAndStream(callInfo);
+
+    } catch (e) {
+      console.error("[duox-intercom] connect error", e);
+      this._cleanup();
+      this._setState("error", e.message || "Connection failed");
+    }
+  }
+
+  async _joinAndStream(callInfo) {
 
       const socket = _io(callInfo.socket_url, {
         transports: ["websocket"],
@@ -264,12 +283,6 @@ class DuoxIntercomCard extends HTMLElement {
       }
 
       this._setState("preview");
-
-    } catch (e) {
-      console.error("[duox-intercom] connect error", e);
-      this._cleanup();
-      this._setState("error", e.message || "Connection failed");
-    }
   }
 
   /* -- Pickup / talk ----------------------------------------------- */
@@ -463,6 +476,22 @@ class DuoxIntercomCard extends HTMLElement {
       });
     } catch (e) {
       console.error("[duox-intercom] ws error", e);
+      return null;
+    }
+  }
+
+  async _triggerAutoon() {
+    if (!this._hass) return null;
+    try {
+      console.debug("[duox-intercom] calling duox/autoon...");
+      const result = await this._hass.callWS({
+        type: "duox/autoon",
+        entry_id: this._entryId,
+      });
+      console.debug("[duox-intercom] autoon result:", result);
+      return result;
+    } catch (e) {
+      console.error("[duox-intercom] autoon error:", e);
       return null;
     }
   }

@@ -405,3 +405,21 @@ class FermaxClient:
         except Exception:
             LOGGER.warning("Failed to decode photo data for %s", photo_id)
             return None
+
+    async def async_autoon(
+        self, device_id: str, directed_to: str
+    ) -> None:
+        """Initiate an outbound monitor call to the panel camera.
+
+        This triggers the Fermax panel to start a video session and send
+        an FCM notification with streaming metadata (RoomId, SocketUrl, etc.).
+        """
+        url = (
+            f"{BASE_URL}/deviceaction/api/v1/device/{device_id}/autoon"
+            f"?deviceID={device_id}&directedTo={directed_to}"
+        )
+        await self._async_request(
+            "POST",
+            url,
+            json={"directedTo": directed_to, "deviceID": device_id},
+        )
