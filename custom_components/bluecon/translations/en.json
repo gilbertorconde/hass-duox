@@ -1,43 +1,57 @@
 {
-  "config": {
-    "step": {
-      "user": {
-        "title": "Sign-in with Fermax Blue account",
-        "data": {
-          "username": "Username",
-          "password": "Password"
-        }
-      },
-      "reconfigure": {
-        "title": "Sign-in with Fermax Blue account",
-        "data": {
-          "username": "Username",
-          "password": "Password"
-        }
-      }
-    },
-    "error": {
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
-    },
-    "abort": {
-      "already_configured": "Account is already configured",
-      "reconfigure_successful": "Integration reconfigured",
-      "entry_not_found": "Entry not found"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Integration Settings",
-        "data": {
-          "lockStateReset": "Lock state reset timer"
+    "config": {
+        "step": {
+            "user": {
+                "title": "Sign-in with Fermax Blue account",
+                "data": {
+                    "username": "Username",
+                    "password": "Password"
+                }
+            },
+            "reconfigure": {
+                "title": "Sign-in with Fermax Blue account",
+                "data": {
+                    "username": "Username",
+                    "password": "Password"
+                }
+            }
         },
-        "description": "Time to reset the lock back to locked once it is unlocked, in seconds."
-      }
+        "error": {
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Unexpected error"
+        },
+        "abort": {
+            "already_configured": "Account is already configured",
+            "reconfigure_successful": "Integration reconfigured",
+            "entry_not_found": "Entry not found"
+        }
     },
-    "error": {
-      "negative_value": "The value must be a positive number"
+    "options": {
+        "step": {
+            "init": {
+                "title": "Integration Settings",
+                "data": {
+                    "lockStateReset": "Lock state reset timer"
+                },
+                "description": "Time to reset the lock back to locked once it is unlocked, in seconds."
+            }
+        },
+        "error": {
+            "negative_value": "The value must be a positive number"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "wifi_signal": {
+                "state": {
+                    "terrible": "Terrible",
+                    "bad": "Bad",
+                    "weak": "Weak",
+                    "good": "Good",
+                    "excellent": "Excellent",
+                    "unknown": "Unknown"
+                }
+            }
+        }
     }
-  }
 }

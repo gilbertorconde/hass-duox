@@ -1,69 +1,57 @@
 {
-  "config": {
-    "step": {
-      "user": {
-        "title": "Sign-in with Fermax Blue account",
-        "data": {
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "client_id": "Fermax API Client ID",
-          "client_secret": "Fermax API Client Secret",
-          "api_key": "Google API Key",
-          "senderId": "FCM Sender ID",
-          "appId": "FCM App ID",
-          "projectId": " FCM Project ID",
-          "packageName": "FCM Package Name"
-        }
-      },
-      "reconfigure": {
-        "title": "Sign-in with Fermax Blue account",
-        "data": {
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "client_id": "Fermax API Client ID",
-          "client_secret": "Fermax API Client Secret",
-          "api_key": "Google API Key",
-          "senderId": "FCM Sender ID",
-          "appId": "FCM App ID",
-          "projectId": " FCM Project ID",
-          "packageName": "FCM Package Name"
-        }
-      }
-    },
-    "error": {
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]"
-    },
-    "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Integration Settings",
-        "data": {
-          "lockStateReset": "Lock state reset timer"
+    "config": {
+        "step": {
+            "user": {
+                "title": "Sign-in with Fermax Blue account",
+                "data": {
+                    "username": "[%key:common::config_flow::data::username%]",
+                    "password": "[%key:common::config_flow::data::password%]"
+                }
+            },
+            "reconfigure": {
+                "title": "Sign-in with Fermax Blue account",
+                "data": {
+                    "username": "[%key:common::config_flow::data::username%]",
+                    "password": "[%key:common::config_flow::data::password%]"
+                }
+            }
         },
-        "description": "Time to reset the lock back to locked once it is unlocked, in seconds."
-      }
+        "error": {
+            "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+            "unknown": "[%key:common::config_flow::error::unknown%]"
+        },
+        "abort": {
+            "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+            "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]",
+            "entry_not_found": "Entry not found"
+        }
     },
-    "error": {
-      "negative_value": "The value must be a positive number"
+    "options": {
+        "step": {
+            "init": {
+                "title": "Integration Settings",
+                "data": {
+                    "lockStateReset": "Lock state reset timer"
+                },
+                "description": "Time to reset the lock back to locked once it is unlocked, in seconds."
+            }
+        },
+        "error": {
+            "negative_value": "The value must be a positive number"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "wifi_signal": {
+                "state": {
+                    "terrible": "Terrible",
+                    "bad": "Bad",
+                    "weak": "Weak",
+                    "good": "Good",
+                    "excellent": "Excellent",
+                    "unknown": "Unknown"
+                }
+            }
+        }
     }
-  },
-  "entity": {
-      "sensor": {
-          "wifi-state": {
-              "state": {
-                  "terrible": "Terrible",
-                  "bad": "Bad",
-                  "weak": "Weak",
-                  "good": "Good",
-                  "excelent": "Excelent",
-                  "unknown": "Unknown"
-              }
-          }
-      }
-  }
 }

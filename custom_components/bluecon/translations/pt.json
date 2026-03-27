@@ -1,69 +1,57 @@
 {
-  "config": {
-    "step": {
-      "user": {
-        "title": "Entrar com a sua conta Fermax Blue",
-        "data": {
-          "username": "Nome de utilizador",
-          "password": "Password",
-          "client_id": "Fermax API Client ID",
-          "client_secret": "Fermax API Client Secret",
-          "api_key": "Google API Key",
-          "senderId": "FCM Sender ID",
-          "appId": "FCM App ID",
-          "projectId": " FCM Project ID",
-          "packageName": "FCM Package Name"
-        }
-      },
-      "reconfigure": {
-        "title": "Entrar com a sua conta Fermax Blue",
-        "data": {
-          "username": "Nome de utilizador",
-          "password": "Password",
-          "client_id": "Fermax API Client ID",
-          "client_secret": "Fermax API Client Secret",
-          "api_key": "Google API Key",
-          "senderId": "FCM Sender ID",
-          "appId": "FCM App ID",
-          "projectId": " FCM Project ID",
-          "packageName": "FCM Package Name"
-        }
-      }
-    },
-    "error": {
-      "invalid_auth": "Autenticação inválida"
-    },
-    "abort": {
-      "already_configured": "A conta já está registada",
-      "reconfigure_successful": "Integração reconfigurada"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Definições da integração",
-        "data": {
-          "lockStateReset": "Temporizador de reset do estado da fechadura"
+    "config": {
+        "step": {
+            "user": {
+                "title": "Entrar com a sua conta Fermax Blue",
+                "data": {
+                    "username": "Nome de utilizador",
+                    "password": "Password"
+                }
+            },
+            "reconfigure": {
+                "title": "Entrar com a sua conta Fermax Blue",
+                "data": {
+                    "username": "Nome de utilizador",
+                    "password": "Password"
+                }
+            }
         },
-        "description": "Tempo para colocar o estado da fechadura como fechado depois de abrir, em segundos."
-      }
+        "error": {
+            "invalid_auth": "Autenticação inválida",
+            "unknown": "Erro inesperado"
+        },
+        "abort": {
+            "already_configured": "A conta já está registada",
+            "reconfigure_successful": "Integração reconfigurada",
+            "entry_not_found": "Entrada não encontrada"
+        }
     },
-    "error": {
-      "negative_value": "O número tem de ser positivo"
+    "options": {
+        "step": {
+            "init": {
+                "title": "Definições da integração",
+                "data": {
+                    "lockStateReset": "Temporizador de reset do estado da fechadura"
+                },
+                "description": "Tempo para colocar o estado da fechadura como fechado depois de abrir, em segundos."
+            }
+        },
+        "error": {
+            "negative_value": "O número tem de ser positivo"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "wifi_signal": {
+                "state": {
+                    "terrible": "Terrível",
+                    "bad": "Mau",
+                    "weak": "Fraco",
+                    "good": "Bom",
+                    "excellent": "Excelente",
+                    "unknown": "Desconhecido"
+                }
+            }
+        }
     }
-  },
-  "entity": {
-      "sensor": {
-          "wifi-state": {
-              "state": {
-                  "terrible": "Terrível",
-                  "bad": "Mau",
-                  "weak": "Fraco",
-                  "good": "Bom",
-                  "excelent": "Excelente",
-                  "unknown": "Desconhecido"
-              }
-          }
-      }
-  }
 }
