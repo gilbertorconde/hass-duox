@@ -543,6 +543,8 @@ class DuoxIntercomCard extends HTMLElement {
     const vw = this.shadowRoot.getElementById("vw");
     if (!vw) return;
 
+    vw.querySelector(".photo-viewer")?.remove();
+
     const viewer = document.createElement("div");
     viewer.className = "photo-viewer";
     viewer.innerHTML = `<button class="pv-close">\u00d7</button>${
