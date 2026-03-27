@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.3";
+const CARD_VERSION = "0.1.4";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -47,6 +47,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._config = config;
     this._entryId = config.entry_id || "";
     this._cameraEntity = config.camera_entity || "";
+    this._lockEntity = config.lock_entity || "";
     this._hass = null;
     this._state = "idle";       // idle | connecting | preview | call | error
     this._socket = null;
@@ -116,10 +117,12 @@ class DuoxIntercomCard extends HTMLElement {
         .btn-talk     { background: #2196F3; }
         .btn-mute     { background: #FF9800; }
         .btn-hangup   { background: #f44336; }
+        .btn-unlock   { background: #9C27B0; }
         .status {
           text-align: center; padding: 6px 12px;
           font-size: 12px; color: var(--secondary-text-color, #666);
         }
+        .status:empty { display: none; }
         .status.error { color: #f44336; }
       </style>
 
@@ -145,11 +148,13 @@ class DuoxIntercomCard extends HTMLElement {
             ${state === "connecting"
               ? `<button class="btn-hangup" id="btnHangup">Cancel</button>`
               : ""}
+            ${this._lockEntity && state !== "connecting"
+              ? `<button class="btn-unlock" id="btnUnlock">\uD83D\uDD11 Open</button>`
+              : ""}
           </div>
           <div class="status${state === "error" ? " error" : ""}" id="status">
-            ${state === "idle" ? "Ready"
-              : state === "connecting" ? "Connecting\u2026"
-              : state === "preview" ? "Preview — press Talk to speak"
+            ${state === "connecting" ? "Connecting\u2026"
+              : state === "preview" ? "Preview \u2014 press Talk to speak"
               : state === "call" ? "In call"
               : state === "error" ? `Error: ${err}`
               : ""}
@@ -167,6 +172,7 @@ class DuoxIntercomCard extends HTMLElement {
     $("btnTalk")?.addEventListener("click", () => this._pickup());
     $("btnMute")?.addEventListener("click", () => this._toggleMute());
     $("btnHangup")?.addEventListener("click", () => this._hangup());
+    $("btnUnlock")?.addEventListener("click", () => this._unlock());
   }
 
   _setState(s, err) {
@@ -348,6 +354,19 @@ class DuoxIntercomCard extends HTMLElement {
     this._setState("idle");
   }
 
+  /* -- Unlock gate ------------------------------------------------- */
+
+  async _unlock() {
+    if (!this._hass || !this._lockEntity) return;
+    try {
+      await this._hass.callService("lock", "open", {
+        entity_id: this._lockEntity,
+      });
+    } catch (e) {
+      console.error("[duox-intercom] unlock error", e);
+    }
+  }
+
   _cleanup() {
     try { this._micProducer?.close(); } catch (_) {}
     try { this._videoConsumer?.close(); } catch (_) {}
@@ -499,7 +518,7 @@ class DuoxIntercomCard extends HTMLElement {
   /* -- Card editor helpers ----------------------------------------- */
 
   static getStubConfig() {
-    return { entry_id: "", camera_entity: "" };
+    return { entry_id: "", camera_entity: "", lock_entity: "" };
   }
 
   getCardSize() {
