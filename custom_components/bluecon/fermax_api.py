@@ -349,3 +349,30 @@ class FermaxClient:
     async def async_f1(self, device_id: str) -> None:
         url = f"{BASE_URL}/deviceaction/api/v1/device/{device_id}/f1"
         await self._async_request("POST", url, json={"deviceID": device_id})
+
+    async def async_register_app_token(
+        self, token: str, active: bool = True
+    ) -> None:
+        """Register/unregister FCM token with Fermax for push notifications."""
+        url = f"{BASE_URL}/notification/api/v1/apptoken"
+        await self._async_request(
+            "POST",
+            url,
+            json={
+                "token": token,
+                "appVersion": "3.3.2",
+                "locale": "en",
+                "os": "Android",
+                "osVersion": "Android 13",
+                "active": active,
+            },
+        )
+
+    async def async_acknowledge_notification(self, fcm_message_id: str) -> None:
+        """Acknowledge a call notification."""
+        url = f"{BASE_URL}/callmanager/api/v1/message/ack"
+        await self._async_request(
+            "POST",
+            url,
+            json={"attended": True, "fcmMessageId": fcm_message_id},
+        )

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
@@ -65,12 +65,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "pairings": pairings,
         "device_info": device_info,
         "coordinator": coordinator,
+        "has_fcm": False,
+        "notification_listener": None,
     }
+
+    has_fcm = await _start_fcm_listener(hass, entry, client)
+    hass.data[DOMAIN][entry.entry_id]["has_fcm"] = has_fcm
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
     return True
+
+
+async def _start_fcm_listener(
+    hass: HomeAssistant, entry: ConfigEntry, client: FermaxClient
+) -> bool:
+    """Attempt to start the FCM notification listener. Returns True if successful."""
+    try:
+        from .notifications import FermaxNotificationListener  # noqa: E402
+
+        listener = FermaxNotificationListener(hass, client, entry.entry_id)
+        await listener.async_start()
+        hass.data[DOMAIN][entry.entry_id]["notification_listener"] = listener
+
+        async def _stop_listener(event: object) -> None:
+            await listener.async_stop()
+
+        entry.async_on_unload(
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _stop_listener)
+        )
+
+        LOGGER.info("FCM doorbell notification listener active")
+        return True
+    except ImportError:
+        LOGGER.info(
+            "firebase-messaging not installed; doorbell notifications disabled"
+        )
+        return False
+    except Exception:
+        LOGGER.exception("Failed to start FCM notification listener")
+        return False
 
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -80,6 +115,10 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    listener = hass.data[DOMAIN][entry.entry_id].get("notification_listener")
+    if listener:
+        await listener.async_stop()
+
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
