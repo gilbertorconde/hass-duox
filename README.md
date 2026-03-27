@@ -84,6 +84,83 @@ logger:
     custom_components.duox: debug
 ```
 
+### Mobile Notifications
+
+Get push notifications on your phone when someone rings the doorbell, with auto-connect to the live feed.
+
+**Prerequisites:** Install the [Home Assistant Companion App](https://companion.home-assistant.io/) on your Android/iOS phone and connect it to your HA instance.
+
+#### 1. Create a Doorbell Dashboard
+
+1. Go to **Settings** > **Dashboards** > **Add Dashboard**.
+2. Set Title: `Doorbell`, Icon: `mdi:doorbell-video`, URL: `doorbell`.
+3. Open the new dashboard, edit it, and add the intercom card (see [Intercom Card Setup](#intercom-card-setup) above).
+
+#### 2. Create the Automation
+
+Go to **Settings** > **Automations & Scenes** > **Create Automation**, switch to YAML mode, and paste:
+
+```yaml
+alias: Doorbell Ring Notification
+description: Notify on doorbell ring, update to missed if not answered
+triggers:
+  - entity_id:
+      - binary_sensor.duox_doorbell_general
+    to: "on"
+    from: "off"
+    trigger: state
+    id: ring
+  - entity_id:
+      - binary_sensor.duox_doorbell_general
+    to: "off"
+    from: "on"
+    trigger: state
+    id: missed
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: ring
+        sequence:
+          - action: notify.mobile_app_YOUR_PHONE
+            data:
+              title: Doorbell
+              message: Someone is at the door
+              data:
+                image: /api/camera_proxy/camera.duox_doorbell_camera
+                clickAction: /dashboard-doorbell/0?autoconnect=1
+                tag: doorbell
+                channel: doorbell
+                importance: high
+                ttl: 0
+                priority: high
+      - conditions:
+          - condition: trigger
+            id: missed
+        sequence:
+          - action: notify.mobile_app_YOUR_PHONE
+            data:
+              title: Missed call
+              message: You missed a doorbell ring
+              data:
+                image: /api/camera_proxy/camera.duox_doorbell_camera
+                clickAction: /dashboard-doorbell/0
+                tag: doorbell
+                channel: doorbell
+                importance: default
+mode: single
+```
+
+Replace `YOUR_PHONE` with your phone's name (find it under **Developer Tools** > **Actions**, search for `mobile_app`). Duplicate the `action` blocks for each phone you want to notify.
+
+**How it works:**
+- When someone rings, you get a high-priority notification with the doorbell snapshot. Tapping it opens the intercom dashboard and **automatically starts the video feed** (`?autoconnect=1`).
+- If you don't answer, the notification is replaced with a "Missed call" message (same `tag: doorbell`). Tapping it opens the dashboard without auto-connecting.
+
+#### 3. Customize the Notification Sound
+
+After receiving the first notification, go to your phone's **Settings** > **Apps** > **Home Assistant** > **Notifications** > **doorbell** channel and set a distinctive ringtone.
+
 ## How It Works
 
 ### Doorbell Notifications

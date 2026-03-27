@@ -110,6 +110,15 @@ class DuoxIntercomCard extends HTMLElement {
     const prev = this._hass;
     this._hass = hass;
 
+    if (!prev && this._state === "idle") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("autoconnect") === "1") {
+        url.searchParams.delete("autoconnect");
+        window.history.replaceState(null, "", url.toString());
+        setTimeout(() => this._connect(), 500);
+      }
+    }
+
     if (this._wifiEntity && prev) {
       const oldWifi = prev.states[this._wifiEntity];
       const newWifi = hass.states[this._wifiEntity];
