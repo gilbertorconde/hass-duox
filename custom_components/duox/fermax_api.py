@@ -411,15 +411,19 @@ class FermaxClient:
             return None
 
     async def async_autoon(
-        self, device_id: str, access_id: AccessId | None = None
+        self,
+        device_id: str,
+        gcm_token: str,
+        call_as: str | None = None,
     ) -> None:
-        """Initiate an outbound monitor call to the panel camera.
+        """Initiate an outbound monitor call to the panel camera (V2 API).
 
-        This triggers the Fermax panel to start a video session and send
-        an FCM notification with streaming metadata (RoomId, SocketUrl, etc.).
+        The server uses *directedToBluestream* (the GCM push token) to know
+        which device should receive the resulting FCM call notification.
+        *callAs* optionally identifies which panel/plate to reach.
         """
-        url = f"{BASE_URL}/deviceaction/api/v1/device/{device_id}/autoon"
-        body: dict[str, Any] = {"deviceID": device_id}
-        if access_id:
-            body["accessId"] = access_id.to_dict()
+        url = f"{BASE_URL}/deviceaction/api/v2/device/{device_id}/autoon"
+        body: dict[str, Any] = {"directedToBluestream": gcm_token}
+        if call_as:
+            body["callAs"] = call_as
         await self._async_request("POST", url, json=body)

@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.5";
+const CARD_VERSION = "0.1.6";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -243,7 +243,7 @@ class DuoxIntercomCard extends HTMLElement {
       const joinResult = await this._emitAck("join_call", {
         roomId: callInfo.room_id,
         appToken: callInfo.gcm_token,
-        fermaxOauthToken: callInfo.fermax_token || callInfo.oauth_token,
+        fermaxOauthToken: callInfo.oauth_token,
         protocolVersion: PROTOCOL_VERSION,
       });
 

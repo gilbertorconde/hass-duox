@@ -118,11 +118,20 @@ async def ws_autoon(
     except Exception:
         LOGGER.debug("Could not fetch raw pairings for debug")
 
+    gcm_token = data.get("gcm_token", "")
+    if not gcm_token:
+        connection.send_error(
+            msg["id"],
+            "no_gcm_token",
+            "GCM push token not available — FCM registration may have failed",
+        )
+        return
+
     try:
         data["active_call"] = None
         await client.async_autoon(
             pairing.device_id,
-            first_door.access_id if first_door else None,
+            gcm_token,
         )
     except Exception as err:
         LOGGER.error("autoon API call failed: %s", err)

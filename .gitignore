@@ -270,3 +270,6 @@ $RECYCLE.BIN/
 
 # APK files (large, only needed locally for credential extraction)
 apks/
+
+# Decompiled APK sources (local reference only)
+apk-decompiled/
