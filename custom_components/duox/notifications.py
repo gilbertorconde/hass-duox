@@ -1,8 +1,9 @@
 """FCM notification listener for Fermax Duox doorbell events.
 
 Uses Android-style GCM registration (matching the real Fermax Blue app)
-so that Fermax's push service recognises the token and delivers doorbell
-ring / call-end notifications.
+and registers the raw GCM token with Fermax — the same approach the
+native Android app takes.  The firebase-messaging library is used only
+for the MCS persistent connection that receives push messages.
 """
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ from .fermax_api import FermaxClient
 
 LOGGER = logging.getLogger(__name__)
 
-FCM_CREDENTIALS_STORAGE_VERSION = 2
+FCM_CREDENTIALS_STORAGE_VERSION = 3
 
 GCM_REGISTER_URL = "https://android.clients.google.com/c2dm/register3"
 
@@ -89,7 +90,7 @@ async def _android_gcm_register(
                     last_error = text
                     continue
                 token = text.split("=")[1]
-                LOGGER.debug("Android GCM token obtained")
+                LOGGER.info("Android GCM token obtained")
                 return token
         except Exception as exc:
             last_error = exc
@@ -100,7 +101,11 @@ async def _android_gcm_register(
                 exc_info=True,
             )
 
-    LOGGER.error("Android GCM registration failed after %d attempts: %s", retries, last_error)
+    LOGGER.error(
+        "Android GCM registration failed after %d attempts: %s",
+        retries,
+        last_error,
+    )
     return None
 
 
@@ -130,11 +135,13 @@ class FermaxNotificationListener:
         credentials = await self._store.async_load()
 
         if not credentials:
-            LOGGER.info("No FCM credentials stored – performing Android registration")
+            LOGGER.info("No FCM credentials — performing Android GCM registration")
             credentials = await self._register_android()
             if not credentials:
-                raise RuntimeError("Failed to register with FCM")
+                raise RuntimeError("Failed to register with GCM")
             await self._store.async_save(credentials)
+
+        gcm_token = credentials["gcm"]["token"]
 
         def on_credentials_updated(creds: dict) -> None:
             self._hass.async_create_task(self._store.async_save(creds))
@@ -154,27 +161,26 @@ class FermaxNotificationListener:
             http_client_session=self._session,
         )
 
-        fcm_token = await self._push_client.checkin_or_register()
-        LOGGER.debug(
-            "FCM token: %s...", fcm_token[:20] if fcm_token else "None"
-        )
+        await self._push_client.checkin_or_register()
 
         try:
-            await self._client.async_register_app_token(fcm_token, active=True)
-            LOGGER.info("Registered FCM token with Fermax API")
+            await self._client.async_register_app_token(gcm_token, active=True)
+            LOGGER.info("Registered GCM token with Fermax API")
         except Exception:
-            LOGGER.exception("Failed to register FCM token with Fermax API")
+            LOGGER.exception("Failed to register GCM token with Fermax API")
 
         await self._push_client.start()
         LOGGER.info("FCM notification listener started")
 
     async def _register_android(self) -> dict[str, Any] | None:
-        """Perform a full Android-style FCM registration.
+        """Perform Android-style GCM registration (no web-push FCM needed).
 
-        1. GCM check-in  (standard, for android_id / security_token)
-        2. GCM register  (Android-style: package name + cert + sender_id)
-        3. Generate ECDH keys
-        4. FCM install + register (web-push subscription for encryption)
+        1. GCM check-in  → android_id + security_token  (for MCS login)
+        2. GCM register  → gcm_token  (Android-style, with package name)
+
+        The GCM token is registered directly with Fermax, matching what the
+        real Android app does.  The firebase-messaging library only needs the
+        GCM credentials to maintain the MCS connection.
         """
         fcm_config = FcmRegisterConfig(
             FCM_PROJECT_ID,
@@ -205,31 +211,27 @@ class FermaxNotificationListener:
             if not gcm_token:
                 return None
 
-            gcm_data = {
-                "token": gcm_token,
-                "app_id": FCM_APP_ID,
-                "android_id": android_id,
-                "security_token": security_token,
-            }
-
             keys = helper.generate_keys()
-
-            fcm_data = await helper.fcm_install_and_register(gcm_data, keys)
-            if not fcm_data:
-                LOGGER.error("FCM install/register failed")
-                return None
 
             credentials: dict[str, Any] = {
                 "keys": keys,
-                "gcm": gcm_data,
-                "fcm": fcm_data,
+                "gcm": {
+                    "token": gcm_token,
+                    "app_id": FCM_APP_ID,
+                    "android_id": android_id,
+                    "security_token": security_token,
+                },
+                "fcm": {
+                    "registration": {"token": gcm_token},
+                    "installation": None,
+                },
                 "config": {
                     "bundle_id": fcm_config.bundle_id,
                     "project_id": fcm_config.project_id,
                     "vapid_key": fcm_config.vapid_key,
                 },
             }
-            LOGGER.info("Android FCM registration completed")
+            LOGGER.info("Android GCM registration completed")
             return credentials
         finally:
             await helper.close()
