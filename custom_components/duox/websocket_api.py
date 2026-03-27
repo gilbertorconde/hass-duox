@@ -102,17 +102,15 @@ async def ws_autoon(
         [(d.name, d.title, d.access_id.to_dict()) for d in pairing.access_doors],
     )
 
-    door_names = [d.name for d in pairing.access_doors if d.visible]
-    if len(door_names) >= 2:
-        directed_to = f"{door_names[0]}/{door_names[1]}"
-    elif len(door_names) == 1:
-        directed_to = f"{pairing.device_id}/{door_names[0]}"
-    elif info.installation_id:
-        directed_to = f"{info.installation_id}/{pairing.id}"
-    else:
-        directed_to = f"{pairing.device_id}/{pairing.id}"
+    visible_doors = [d for d in pairing.access_doors if d.visible]
+    first_door = visible_doors[0] if visible_doors else pairing.access_doors[0] if pairing.access_doors else None
 
-    LOGGER.debug("autoon: directed_to=%s", directed_to)
+    LOGGER.debug(
+        "autoon: device_id=%s door=%s access_id=%s",
+        pairing.device_id,
+        first_door.name if first_door else "none",
+        first_door.access_id.to_dict() if first_door else "none",
+    )
 
     try:
         raw_pairings = await client.async_get_pairings_raw()
@@ -122,7 +120,10 @@ async def ws_autoon(
 
     try:
         data["active_call"] = None
-        await client.async_autoon(pairing.device_id, directed_to)
+        await client.async_autoon(
+            pairing.device_id,
+            first_door.access_id if first_door else None,
+        )
     except Exception as err:
         LOGGER.error("autoon API call failed: %s", err)
         connection.send_error(msg["id"], "autoon_failed", str(err))
