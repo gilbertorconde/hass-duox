@@ -367,6 +367,7 @@ class FermaxNotificationListener:
     ) -> None:
         """Handle incoming FCM notification."""
         LOGGER.debug("FCM notification received: %s", notification)
+        LOGGER.debug("FCM notification keys: %s", list(notification.keys()))
 
         notif_type = notification.get("FermaxNotificationType")
         device_id = notification.get("DeviceId")
@@ -376,6 +377,9 @@ class FermaxNotificationListener:
             return
 
         if notif_type == "Call":
+            LOGGER.info(
+                "Incoming call — raw FCM data: %s", notification
+            )
             access_door_key = notification.get("AccessDoorKey", "")
             fcm_message_id = persistent_id
 
