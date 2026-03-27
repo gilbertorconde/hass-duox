@@ -7,7 +7,7 @@
  *   - socket.io-client v4 (signaling transport)
  */
 
-const CARD_VERSION = "0.1.6";
+const CARD_VERSION = "0.1.7";
 const PROTOCOL_VERSION = "0.8.2";
 
 const MS_CDN = "https://esm.sh/mediasoup-client@3?bundle";
@@ -274,17 +274,10 @@ class DuoxIntercomCard extends HTMLElement {
         device, r.sendTransport, iceServers
       );
 
-      /* Consume video */
+      /* Consume video only — audio is consumed after pickup (matching native app) */
       if (r.producerIdVideo) {
         await this._consumeTrack(
           this._recvVideoTransport, r.producerIdVideo, "video"
-        );
-      }
-
-      /* Consume audio */
-      if (r.producerIdAudio) {
-        await this._consumeTrack(
-          this._recvAudioTransport, r.producerIdAudio, "audio"
         );
       }
 
@@ -299,27 +292,6 @@ class DuoxIntercomCard extends HTMLElement {
       const audioTrack = stream.getAudioTracks()[0];
 
       this._micProducer = await this._sendTransport.produce({ track: audioTrack });
-
-      const pickupResult = await this._emitAck("pickup", {
-        parameters: {
-          kind: "audio",
-          rtpParameters: this._micProducer.rtpParameters,
-          appData: {},
-        },
-        rtpCapabilities: this._device.rtpCapabilities,
-      });
-
-      if (pickupResult.error) {
-        throw new Error(pickupResult.error.code || "pickup failed");
-      }
-
-      const pr = pickupResult.result;
-
-      if (pr.consumer && pr.consumer.producerId) {
-        await this._consumeTrack(
-          this._recvAudioTransport, pr.consumer.producerId, "audio"
-        );
-      }
 
       this._setState("call");
 
@@ -402,7 +374,7 @@ class DuoxIntercomCard extends HTMLElement {
     transport.on("connect", ({ dtlsParameters }, callback, errback) => {
       this._emitAck("transport_connect", {
         transportId: transport.id,
-        dtlsParameters: JSON.stringify(dtlsParameters),
+        dtlsParameters: dtlsParameters,
       })
       .then(() => callback())
       .catch(errback);
@@ -423,14 +395,35 @@ class DuoxIntercomCard extends HTMLElement {
     transport.on("connect", ({ dtlsParameters }, callback, errback) => {
       this._emitAck("transport_connect", {
         transportId: transport.id,
-        dtlsParameters: JSON.stringify(dtlsParameters),
+        dtlsParameters: dtlsParameters,
       })
       .then(() => callback())
       .catch(errback);
     });
 
     transport.on("produce", async ({ kind, rtpParameters, appData }, callback, errback) => {
-      callback({ id: transport.id });
+      try {
+        const pickupResult = await this._emitAck("pickup", {
+          parameters: { kind, rtpParameters, appData },
+          rtpCapabilities: this._device.rtpCapabilities,
+        });
+
+        if (pickupResult.error) {
+          errback(new Error(pickupResult.error.code || "pickup failed"));
+          return;
+        }
+
+        const pr = pickupResult.result;
+        callback({ id: pr.producerId });
+
+        if (pr.consumer && pr.consumer.producerId) {
+          await this._consumeTrack(
+            this._recvAudioTransport, pr.consumer.producerId, "audio"
+          );
+        }
+      } catch (e) {
+        errback(e);
+      }
     });
 
     return transport;
@@ -441,7 +434,7 @@ class DuoxIntercomCard extends HTMLElement {
     const resp = await this._emitAck("transport_consume", {
       transportId: transport.id,
       producerId: producerId,
-      rtpCapabilities: typeof caps === "string" ? caps : JSON.stringify(caps),
+      rtpCapabilities: typeof caps === "string" ? safeParse(caps) : caps,
     });
 
     if (resp.error) throw new Error(resp.error.code || "consume failed");
