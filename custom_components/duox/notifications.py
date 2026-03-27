@@ -392,6 +392,7 @@ class FermaxNotificationListener:
                 ),
                 "call_as": notification.get("CallAs", ""),
                 "streaming_mode": notification.get("StreamingMode", ""),
+                "fermax_token": notification.get("FermaxToken", ""),
                 "preview_timeout": int(
                     notification.get("PreviewTimeout", "29")
                 ),
