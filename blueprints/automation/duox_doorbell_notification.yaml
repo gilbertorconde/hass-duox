@@ -1,0 +1,392 @@
+blueprint:
+  name: Duox Doorbell Notification
+  description: >
+    Doorbell notification with repeated ringing, auto-connect, and proper call
+    lifecycle handling (ring → attended / missed / ended).
+    Mirrors the native Fermax app behavior: sends high-priority push
+    notifications that repeat like a phone call, and updates the notification
+    when the call is answered elsewhere, ended, or missed.
+  domain: automation
+  source_url: https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox_doorbell_notification.yaml
+  input:
+    doorbell_entity:
+      name: Doorbell sensor
+      description: The Duox doorbell binary sensor entity.
+      selector:
+        entity:
+          domain: binary_sensor
+
+    camera_entity:
+      name: Camera entity (optional)
+      description: Duox camera entity for doorbell snapshot in the notification.
+      default: ""
+      selector:
+        entity:
+          domain: camera
+
+    dashboard_path:
+      name: Intercom dashboard path
+      description: Lovelace path opened when tapping the notification.
+      default: /dashboard-doorbell/0
+      selector:
+        text:
+
+    notify_device_1:
+      name: Notify device 1
+      description: First mobile device to notify (must have the HA Companion App).
+      selector:
+        device:
+          integration: mobile_app
+
+    notify_device_2:
+      name: Notify device 2 (optional)
+      description: Second mobile device to notify.
+      default: {}
+      selector:
+        device:
+          integration: mobile_app
+
+    notify_device_3:
+      name: Notify device 3 (optional)
+      description: Third mobile device to notify.
+      default: {}
+      selector:
+        device:
+          integration: mobile_app
+
+    autoconnect:
+      name: Auto-connect on tap
+      description: Automatically start the video feed when tapping the notification.
+      default: true
+      selector:
+        boolean:
+
+    timeout_seconds:
+      name: Timeout (seconds)
+      description: Seconds to keep ringing before marking as missed.
+      default: 90
+      selector:
+        number:
+          min: 15
+          max: 300
+          step: 5
+          unit_of_measurement: s
+
+    ring_interval:
+      name: Ring interval (seconds)
+      description: >
+        Re-send the notification every N seconds to simulate a phone call
+        ringing. Each re-send triggers the notification sound and vibration.
+      default: 8
+      selector:
+        number:
+          min: 3
+          max: 30
+          step: 1
+          unit_of_measurement: s
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input doorbell_entity
+    from: "off"
+    to: "on"
+
+variables:
+  dashboard: !input dashboard_path
+  auto: !input autoconnect
+  click_action: >
+    {{ dashboard ~ ('?autoconnect=1' if auto else '') }}
+  cam: !input camera_entity
+  image_url: >
+    {{ '/api/camera_proxy/' ~ cam if cam else '' }}
+  timeout_s: !input timeout_seconds
+  interval_s: !input ring_interval
+  dev1: !input notify_device_1
+  dev2: !input notify_device_2
+  dev3: !input notify_device_3
+  max_rings: "{{ (timeout_s / interval_s) | int }}"
+
+action:
+  # --- Initial ring notification ---
+  - parallel:
+      - device_id: !input notify_device_1
+        domain: mobile_app
+        type: notify
+        title: "Doorbell"
+        message: "Someone is at the door"
+        data:
+          clickAction: "{{ click_action }}"
+          tag: doorbell
+          channel: doorbell
+          importance: high
+          ttl: 0
+          priority: high
+          image: "{{ image_url }}"
+          vibrationPattern: "0, 500, 200, 500, 200, 500"
+          persistent: true
+
+  - if:
+      - condition: template
+        value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
+    then:
+      - device_id: !input notify_device_2
+        domain: mobile_app
+        type: notify
+        title: "Doorbell"
+        message: "Someone is at the door"
+        data:
+          clickAction: "{{ click_action }}"
+          tag: doorbell
+          channel: doorbell
+          importance: high
+          ttl: 0
+          priority: high
+          image: "{{ image_url }}"
+          vibrationPattern: "0, 500, 200, 500, 200, 500"
+          persistent: true
+
+  - if:
+      - condition: template
+        value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
+    then:
+      - device_id: !input notify_device_3
+        domain: mobile_app
+        type: notify
+        title: "Doorbell"
+        message: "Someone is at the door"
+        data:
+          clickAction: "{{ click_action }}"
+          tag: doorbell
+          channel: doorbell
+          importance: high
+          ttl: 0
+          priority: high
+          image: "{{ image_url }}"
+          vibrationPattern: "0, 500, 200, 500, 200, 500"
+          persistent: true
+
+  # --- Repeat ring loop ---
+  - repeat:
+      count: "{{ max_rings }}"
+      sequence:
+        - wait_for_trigger:
+            - platform: event
+              event_type: duox_call_attended
+              id: attended
+            - platform: event
+              event_type: duox_call_ended
+              id: ended
+          timeout:
+            seconds: "{{ interval_s }}"
+
+        - choose:
+            # Call answered on another device
+            - conditions:
+                - condition: template
+                  value_template: "{{ wait.trigger is not none and wait.trigger.id == 'attended' }}"
+              sequence:
+                - parallel:
+                    - device_id: !input notify_device_1
+                      domain: mobile_app
+                      type: notify
+                      title: "Call answered"
+                      message: "Call was answered on another device"
+                      data:
+                        clickAction: "{{ dashboard }}"
+                        tag: doorbell
+                        channel: doorbell
+                        importance: default
+                        persistent: false
+                        timeout: 30
+                - if:
+                    - condition: template
+                      value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
+                  then:
+                    - device_id: !input notify_device_2
+                      domain: mobile_app
+                      type: notify
+                      title: "Call answered"
+                      message: "Call was answered on another device"
+                      data:
+                        clickAction: "{{ dashboard }}"
+                        tag: doorbell
+                        channel: doorbell
+                        importance: default
+                        persistent: false
+                        timeout: 30
+                - if:
+                    - condition: template
+                      value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
+                  then:
+                    - device_id: !input notify_device_3
+                      domain: mobile_app
+                      type: notify
+                      title: "Call answered"
+                      message: "Call was answered on another device"
+                      data:
+                        clickAction: "{{ dashboard }}"
+                        tag: doorbell
+                        channel: doorbell
+                        importance: default
+                        persistent: false
+                        timeout: 30
+                - stop: "Call attended"
+
+            # Call ended (no one picked up)
+            - conditions:
+                - condition: template
+                  value_template: "{{ wait.trigger is not none and wait.trigger.id == 'ended' }}"
+              sequence:
+                - parallel:
+                    - device_id: !input notify_device_1
+                      domain: mobile_app
+                      type: notify
+                      title: "Missed call"
+                      message: "You missed a doorbell ring"
+                      data:
+                        clickAction: "{{ dashboard }}"
+                        tag: doorbell
+                        channel: doorbell
+                        importance: default
+                        image: "{{ image_url }}"
+                        persistent: false
+                - if:
+                    - condition: template
+                      value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
+                  then:
+                    - device_id: !input notify_device_2
+                      domain: mobile_app
+                      type: notify
+                      title: "Missed call"
+                      message: "You missed a doorbell ring"
+                      data:
+                        clickAction: "{{ dashboard }}"
+                        tag: doorbell
+                        channel: doorbell
+                        importance: default
+                        image: "{{ image_url }}"
+                        persistent: false
+                - if:
+                    - condition: template
+                      value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
+                  then:
+                    - device_id: !input notify_device_3
+                      domain: mobile_app
+                      type: notify
+                      title: "Missed call"
+                      message: "You missed a doorbell ring"
+                      data:
+                        clickAction: "{{ dashboard }}"
+                        tag: doorbell
+                        channel: doorbell
+                        importance: default
+                        image: "{{ image_url }}"
+                        persistent: false
+                - stop: "Call ended"
+
+          # No trigger fired — re-ring
+          default:
+            - parallel:
+                - device_id: !input notify_device_1
+                  domain: mobile_app
+                  type: notify
+                  title: "Doorbell"
+                  message: "Someone is at the door (ring {{ repeat.index + 1 }})"
+                  data:
+                    clickAction: "{{ click_action }}"
+                    tag: doorbell
+                    channel: doorbell
+                    importance: high
+                    ttl: 0
+                    priority: high
+                    image: "{{ image_url }}"
+                    vibrationPattern: "0, 500, 200, 500, 200, 500"
+                    persistent: true
+            - if:
+                - condition: template
+                  value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
+              then:
+                - device_id: !input notify_device_2
+                  domain: mobile_app
+                  type: notify
+                  title: "Doorbell"
+                  message: "Someone is at the door (ring {{ repeat.index + 1 }})"
+                  data:
+                    clickAction: "{{ click_action }}"
+                    tag: doorbell
+                    channel: doorbell
+                    importance: high
+                    ttl: 0
+                    priority: high
+                    image: "{{ image_url }}"
+                    vibrationPattern: "0, 500, 200, 500, 200, 500"
+                    persistent: true
+            - if:
+                - condition: template
+                  value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
+              then:
+                - device_id: !input notify_device_3
+                  domain: mobile_app
+                  type: notify
+                  title: "Doorbell"
+                  message: "Someone is at the door (ring {{ repeat.index + 1 }})"
+                  data:
+                    clickAction: "{{ click_action }}"
+                    tag: doorbell
+                    channel: doorbell
+                    importance: high
+                    ttl: 0
+                    priority: high
+                    image: "{{ image_url }}"
+                    vibrationPattern: "0, 500, 200, 500, 200, 500"
+                    persistent: true
+
+  # --- Timeout reached (loop exhausted without attended/ended) ---
+  - parallel:
+      - device_id: !input notify_device_1
+        domain: mobile_app
+        type: notify
+        title: "Missed call"
+        message: "You missed a doorbell ring"
+        data:
+          clickAction: "{{ dashboard }}"
+          tag: doorbell
+          channel: doorbell
+          importance: default
+          image: "{{ image_url }}"
+          persistent: false
+  - if:
+      - condition: template
+        value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
+    then:
+      - device_id: !input notify_device_2
+        domain: mobile_app
+        type: notify
+        title: "Missed call"
+        message: "You missed a doorbell ring"
+        data:
+          clickAction: "{{ dashboard }}"
+          tag: doorbell
+          channel: doorbell
+          importance: default
+          image: "{{ image_url }}"
+          persistent: false
+  - if:
+      - condition: template
+        value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
+    then:
+      - device_id: !input notify_device_3
+        domain: mobile_app
+        type: notify
+        title: "Missed call"
+        message: "You missed a doorbell ring"
+        data:
+          clickAction: "{{ dashboard }}"
+          tag: doorbell
+          channel: doorbell
+          importance: default
+          image: "{{ image_url }}"
+          persistent: false

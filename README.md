@@ -86,7 +86,7 @@ logger:
 
 ### Mobile Notifications
 
-Get push notifications on your phone when someone rings the doorbell, with auto-connect to the live feed.
+Get push notifications on your phone when someone rings the doorbell — repeated ringing like a phone call, with auto-connect to the live feed. Handles the full call lifecycle: ring, answered on another device, missed, and ended.
 
 **Prerequisites:** Install the [Home Assistant Companion App](https://companion.home-assistant.io/) on your Android/iOS phone and connect it to your HA instance.
 
@@ -96,70 +96,41 @@ Get push notifications on your phone when someone rings the doorbell, with auto-
 2. Set Title: `Doorbell`, Icon: `mdi:doorbell-video`, URL: `doorbell`.
 3. Open the new dashboard, edit it, and add the intercom card (see [Intercom Card Setup](#intercom-card-setup) above).
 
-#### 2. Create the Automation
+#### 2. Import the Blueprint
 
-Go to **Settings** > **Automations & Scenes** > **Create Automation**, switch to YAML mode, and paste:
+Click the button below to import the doorbell notification blueprint:
 
-```yaml
-alias: Doorbell Ring Notification
-description: Notify on doorbell ring, update to missed if not answered
-triggers:
-  - entity_id:
-      - binary_sensor.duox_doorbell_general
-    to: "on"
-    from: "off"
-    trigger: state
-    id: ring
-  - entity_id:
-      - binary_sensor.duox_doorbell_general
-    to: "off"
-    from: "on"
-    trigger: state
-    id: missed
-actions:
-  - choose:
-      - conditions:
-          - condition: trigger
-            id: ring
-        sequence:
-          - action: notify.mobile_app_YOUR_PHONE
-            data:
-              title: Doorbell
-              message: Someone is at the door
-              data:
-                image: /api/camera_proxy/camera.duox_doorbell_camera
-                clickAction: /dashboard-doorbell/0?autoconnect=1
-                tag: doorbell
-                channel: doorbell
-                importance: high
-                ttl: 0
-                priority: high
-      - conditions:
-          - condition: trigger
-            id: missed
-        sequence:
-          - action: notify.mobile_app_YOUR_PHONE
-            data:
-              title: Missed call
-              message: You missed a doorbell ring
-              data:
-                image: /api/camera_proxy/camera.duox_doorbell_camera
-                clickAction: /dashboard-doorbell/0
-                tag: doorbell
-                channel: doorbell
-                importance: default
-mode: single
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox_doorbell_notification.yaml)
+
+Or go to **Settings** > **Automations & Scenes** > **Blueprints** > **Import Blueprint** and paste:
+```
+https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox_doorbell_notification.yaml
 ```
 
-Replace `YOUR_PHONE` with your phone's name (find it under **Developer Tools** > **Actions**, search for `mobile_app`). Duplicate the `action` blocks for each phone you want to notify.
+#### 3. Create the Automation from the Blueprint
 
-**How it works:**
-- When someone rings, you get a high-priority notification with the doorbell snapshot. Tapping it opens the intercom dashboard and **automatically starts the video feed** (`?autoconnect=1`).
-- If you don't answer, the notification is replaced with a "Missed call" message (same `tag: doorbell`). Tapping it opens the dashboard without auto-connecting.
+1. Go to **Settings** > **Automations & Scenes** > **Create Automation** > **Use a Blueprint**.
+2. Select **Duox Doorbell Notification**.
+3. Configure the inputs:
 
-#### 3. Customize the Notification Sound
+| Input | Required | Description |
+|-------|----------|-------------|
+| Doorbell sensor | Yes | Your `binary_sensor.duox_doorbell_*` entity. |
+| Camera entity | No | `camera.duox_doorbell_camera` for snapshot in notifications. |
+| Notify device 1 | Yes | Your phone (must have the HA Companion App). |
+| Notify device 2-3 | No | Additional phones to notify. |
+| Intercom dashboard path | No | Dashboard path for the tap action (default: `/dashboard-doorbell/0`). |
+| Auto-connect on tap | No | Start video feed automatically when tapping the notification (default: on). |
+| Timeout | No | Seconds to keep ringing before marking as missed (default: 90). |
+| Ring interval | No | Seconds between repeated ring notifications (default: 8). |
+
+4. Save the automation.
+
+#### 4. Customize the Notification Sound
 
 After receiving the first notification, go to your phone's **Settings** > **Apps** > **Home Assistant** > **Notifications** > **doorbell** channel and set a distinctive ringtone.
+
+**How it works:** The blueprint sends a high-priority notification that repeats every N seconds (like a phone call ringing). If someone answers on another device, the notification is replaced with "Call answered". If no one answers, it becomes "Missed call". Tapping the ringing notification opens your intercom dashboard and auto-connects to the live video feed.
 
 ## How It Works
 
