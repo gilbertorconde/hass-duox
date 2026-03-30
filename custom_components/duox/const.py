@@ -22,6 +22,7 @@ FCM_PROJECT_ID = _d("AhAdFUweSBABFB0=")
 FCM_PACKAGE_NAME = _d("BxoCVksDFx8MGVZPBBQWXQUFHw==")
 
 SIGNAL_CALL_STARTED = "{}_call_started_{}"
+SIGNAL_DOORBELL_RING = "{}_doorbell_ring_{}"
 SIGNAL_CALL_ENDED = "{}_call_ended"
 SIGNAL_CALL_ATTENDED = "{}_call_attended"
 

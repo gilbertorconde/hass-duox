@@ -37,6 +37,7 @@ from .const import (
     SIGNAL_CALL_ATTENDED,
     SIGNAL_CALL_ENDED,
     SIGNAL_CALL_STARTED,
+    SIGNAL_DOORBELL_RING,
     SIGNALING_SERVER_URL,
 )
 from .fermax_api import FermaxClient
@@ -406,7 +407,14 @@ class FermaxNotificationListener:
                 self._hass,
                 SIGNAL_CALL_STARTED.format(device_id, access_door_key),
             )
-            self._hass.bus.async_fire(f"{DOMAIN}_doorbell_ring", base_event_data)
+
+            if notif_type == "Call":
+                self._hass.bus.async_fire(f"{DOMAIN}_doorbell_ring", base_event_data)
+                async_dispatcher_send(
+                    self._hass,
+                    SIGNAL_DOORBELL_RING.format(device_id, access_door_key),
+                )
+
             self._hass.bus.async_fire(f"{DOMAIN}_incoming_call", call_data)
 
             if notification.get("SendAcknowledge"):

@@ -17,7 +17,7 @@ from .const import (
     DOMAIN,
     HASS_DUOX_VERSION,
     SIGNAL_CALL_ENDED,
-    SIGNAL_CALL_STARTED,
+    SIGNAL_DOORBELL_RING,
 )
 from .coordinator import FermaxCoordinator
 from .fermax_api import DeviceInfo as FermaxDeviceInfo, Pairing
@@ -116,7 +116,7 @@ class DuoxDoorbellSensor(BinarySensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                SIGNAL_CALL_STARTED.format(
+                SIGNAL_DOORBELL_RING.format(
                     self._device_id, self._access_door_name
                 ),
                 self._call_started,
