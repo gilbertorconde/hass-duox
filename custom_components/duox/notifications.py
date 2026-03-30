@@ -34,6 +34,7 @@ from .const import (
     FCM_PACKAGE_NAME,
     FCM_PROJECT_ID,
     FCM_SENDER_ID,
+    SIGNAL_CALL_ATTENDED,
     SIGNAL_CALL_ENDED,
     SIGNAL_CALL_STARTED,
     SIGNALING_SERVER_URL,
@@ -367,7 +368,6 @@ class FermaxNotificationListener:
     ) -> None:
         """Handle incoming FCM notification."""
         LOGGER.debug("FCM notification received: %s", notification)
-        LOGGER.debug("FCM notification keys: %s", list(notification.keys()))
 
         notif_type = notification.get("FermaxNotificationType")
         device_id = notification.get("DeviceId")
@@ -376,63 +376,99 @@ class FermaxNotificationListener:
             LOGGER.debug("Ignoring non-Fermax notification: %s", notification)
             return
 
+        access_door_key = notification.get("AccessDoorKey", "")
+        call_as = notification.get("CallAs", "")
+        room_id = notification.get("RoomId", "")
+
+        base_event_data = {
+            "device_id": device_id,
+            "access_door_key": access_door_key,
+            "call_as": call_as,
+            "room_id": room_id,
+            "notification_type": notif_type,
+        }
+
         if notif_type in ("Call", "Autoon"):
-            LOGGER.info(
-                "Incoming call — raw FCM data: %s", notification
-            )
-            access_door_key = notification.get("AccessDoorKey", "")
-            fcm_message_id = persistent_id
+            LOGGER.info("Incoming %s — device=%s door=%s", notif_type, device_id, access_door_key)
 
             call_data = {
-                "device_id": device_id,
-                "access_door_key": access_door_key,
-                "room_id": notification.get("RoomId", ""),
-                "socket_url": notification.get(
-                    "SocketUrl", SIGNALING_SERVER_URL
-                ),
-                "call_as": notification.get("CallAs", ""),
+                **base_event_data,
+                "socket_url": notification.get("SocketUrl", SIGNALING_SERVER_URL),
                 "streaming_mode": notification.get("StreamingMode", ""),
                 "fermax_token": notification.get("FermaxToken", ""),
-                "preview_timeout": int(
-                    notification.get("PreviewTimeout", "29")
-                ),
-                "conversation_timeout": int(
-                    notification.get("ConversationTimeout", "90")
-                ),
+                "preview_timeout": int(notification.get("PreviewTimeout", "29")),
+                "conversation_timeout": int(notification.get("ConversationTimeout", "90")),
             }
 
             self._hass.data[DOMAIN][self._entry_id]["active_call"] = call_data
 
-            LOGGER.info(
-                "Doorbell ring: device=%s door=%s room=%s",
-                device_id,
-                access_door_key,
-                call_data["room_id"],
-            )
             async_dispatcher_send(
                 self._hass,
                 SIGNAL_CALL_STARTED.format(device_id, access_door_key),
             )
-            self._hass.bus.async_fire(
-                f"{DOMAIN}_doorbell_ring",
-                {"device_id": device_id, "access_door_key": access_door_key},
-            )
-            self._hass.bus.async_fire(
-                f"{DOMAIN}_incoming_call",
-                call_data,
-            )
+            self._hass.bus.async_fire(f"{DOMAIN}_doorbell_ring", base_event_data)
+            self._hass.bus.async_fire(f"{DOMAIN}_incoming_call", call_data)
 
             if notification.get("SendAcknowledge"):
                 self._hass.async_create_task(
-                    self._client.async_acknowledge_notification(fcm_message_id)
+                    self._client.async_acknowledge_notification(persistent_id)
+                )
+
+        elif notif_type == "CallAttend":
+            LOGGER.info("Call attended by another device: device=%s", device_id)
+            self._hass.data[DOMAIN][self._entry_id]["active_call"] = None
+
+            async_dispatcher_send(
+                self._hass,
+                SIGNAL_CALL_ATTENDED.format(device_id),
+            )
+            async_dispatcher_send(
+                self._hass,
+                SIGNAL_CALL_ENDED.format(device_id),
+            )
+            self._hass.bus.async_fire(f"{DOMAIN}_call_attended", base_event_data)
+
+            if notification.get("SendAcknowledge"):
+                self._hass.async_create_task(
+                    self._client.async_acknowledge_notification(persistent_id)
                 )
 
         elif notif_type == "CallEnd":
             LOGGER.info("Call ended: device=%s", device_id)
             self._hass.data[DOMAIN][self._entry_id]["active_call"] = None
+
             async_dispatcher_send(
                 self._hass,
                 SIGNAL_CALL_ENDED.format(device_id),
             )
+            self._hass.bus.async_fire(f"{DOMAIN}_call_ended", base_event_data)
+
+            if notification.get("SendAcknowledge"):
+                self._hass.async_create_task(
+                    self._client.async_acknowledge_notification(persistent_id)
+                )
+
+        elif notif_type == "ChangeVideoSource":
+            LOGGER.info("Video source change: device=%s", device_id)
+            self._hass.bus.async_fire(f"{DOMAIN}_change_video", base_event_data)
+
+        elif notif_type == "Info":
+            title = notification.get("NotificationTitle", "")
+            body = notification.get("NotificationBody", "")
+            LOGGER.info("Info notification: %s — %s", title, body)
+            self._hass.bus.async_fire(f"{DOMAIN}_info", {
+                **base_event_data,
+                "title": title,
+                "body": body,
+            })
+
+        elif notif_type == "FwUpdate":
+            LOGGER.info("Firmware update available: device=%s", device_id)
+            self._hass.bus.async_fire(f"{DOMAIN}_fw_update", base_event_data)
+
+        elif notif_type == "Logout":
+            LOGGER.warning("Logout notification received: device=%s", device_id)
+            self._hass.bus.async_fire(f"{DOMAIN}_logout", base_event_data)
+
         else:
-            LOGGER.debug("Unknown notification type: %s", notif_type)
+            LOGGER.debug("Unhandled notification type: %s — %s", notif_type, notification)

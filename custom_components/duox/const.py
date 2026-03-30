@@ -14,6 +14,7 @@ FCM_PACKAGE_NAME = "com.fermax.blue.app"
 
 SIGNAL_CALL_STARTED = "{}_call_started_{}"
 SIGNAL_CALL_ENDED = "{}_call_ended"
+SIGNAL_CALL_ATTENDED = "{}_call_attended"
 
 SIGNALING_SERVER_URL = "http://signaling-pro-duoxme.fermax.io"
 
