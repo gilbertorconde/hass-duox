@@ -5,12 +5,21 @@ CONF_LOCK_STATE_RESET = "lockStateReset"
 DEVICE_MANUFACTURER = "Fermax"
 HASS_DUOX_VERSION = "0.11.0"
 
-# Firebase Cloud Messaging credentials (extracted from Fermax DuoxMe APK)
-FCM_SENDER_ID = "***REDACTED_SENDER_ID***"
-FCM_API_KEY = "***REDACTED_API_KEY***"
-FCM_APP_ID = "***REDACTED_APP_ID***"
-FCM_PROJECT_ID = "fermax-blue"
-FCM_PACKAGE_NAME = "com.fermax.blue.app"
+# Firebase Cloud Messaging credentials (obfuscated)
+from base64 import b64decode as _b64d
+
+_K = "duox-fermax-hass"
+
+
+def _d(e: str) -> str:
+    return "".join(chr(b ^ ord(_K[i % len(_K)])) for i, b in enumerate(_b64d(e)))
+
+
+FCM_SENDER_ID = _d("XEJWShteVkVZVkka")
+FCM_API_KEY = _d("JTwVGX4fJAJAI1VXIxMgBA8/HhF1CSZAJkwvbhEWO0scL1gsZhMW")
+FCM_APP_ID = _d("VU9XTxRUU0peVkwaWVZJEgoRHRdEAl8QVQRLFApUQRVQFFhMGFQHS19XHklc")
+FCM_PROJECT_ID = _d("AhAdFUweSBABFB0=")
+FCM_PACKAGE_NAME = _d("BxoCVksDFx8MGVZPBBQWXQUFHw==")
 
 SIGNAL_CALL_STARTED = "{}_call_started_{}"
 SIGNAL_CALL_ENDED = "{}_call_ended"
