@@ -195,7 +195,6 @@ async def ws_call_history(
 
     try:
         entries = await client.async_get_call_registry(gcm_token)
-        LOGGER.debug("call_history raw response (%d entries): %s", len(entries), entries[:3] if entries else entries)
         connection.send_result(msg["id"], entries)
     except Exception as err:
         LOGGER.error("call_history fetch failed: %s", err)

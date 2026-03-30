@@ -461,7 +461,6 @@ class DuoxIntercomCard extends HTMLElement {
     }
 
     list.innerHTML = items.map((e, i) => {
-      console.debug("[duox-intercom] history entry", i, "callDate:", e.callDate, "typeof:", typeof e.callDate, "raw:", JSON.stringify(e));
       const state = (e.registerCall || "U").toUpperCase();
       const isAutoon = e.isAutoon === true || e.isAutoon === "true";
       let cssClass, icon;
