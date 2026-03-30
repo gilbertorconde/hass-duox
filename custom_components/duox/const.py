@@ -3,7 +3,7 @@ DOMAIN = "duox"
 CONF_LOCK_STATE_RESET = "lockStateReset"
 
 DEVICE_MANUFACTURER = "Fermax"
-HASS_DUOX_VERSION = "0.11.1"
+HASS_DUOX_VERSION = "1.0.0"
 
 # Firebase Cloud Messaging credentials (obfuscated)
 from base64 import b64decode as _b64d

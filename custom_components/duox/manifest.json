@@ -1,7 +1,7 @@
 {
     "domain": "duox",
     "name": "Fermax Duox",
-    "version": "0.11.1",
+    "version": "1.0.0",
     "documentation": "https://github.com/gilbertorconde/hass-duox",
     "issue_tracker": "https://github.com/gilbertorconde/hass-duox/issues",
     "requirements": ["firebase-messaging>=0.4.0"],
