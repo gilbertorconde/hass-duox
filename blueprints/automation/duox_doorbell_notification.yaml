@@ -125,7 +125,6 @@ action:
           ttl: 0
           priority: high
           image: "{{ image_url }}"
-          vibrationPattern: "0, 500, 200, 500, 200, 500"
           persistent: true
 
   - if:
@@ -145,7 +144,6 @@ action:
           ttl: 0
           priority: high
           image: "{{ image_url }}"
-          vibrationPattern: "0, 500, 200, 500, 200, 500"
           persistent: true
 
   - if:
@@ -165,7 +163,6 @@ action:
           ttl: 0
           priority: high
           image: "{{ image_url }}"
-          vibrationPattern: "0, 500, 200, 500, 200, 500"
           persistent: true
 
   # --- Repeat ring loop ---
@@ -303,7 +300,6 @@ action:
                     ttl: 0
                     priority: high
                     image: "{{ image_url }}"
-                    vibrationPattern: "0, 500, 200, 500, 200, 500"
                     persistent: true
             - if:
                 - condition: template
@@ -322,7 +318,6 @@ action:
                     ttl: 0
                     priority: high
                     image: "{{ image_url }}"
-                    vibrationPattern: "0, 500, 200, 500, 200, 500"
                     persistent: true
             - if:
                 - condition: template
@@ -341,7 +336,6 @@ action:
                     ttl: 0
                     priority: high
                     image: "{{ image_url }}"
-                    vibrationPattern: "0, 500, 200, 500, 200, 500"
                     persistent: true
 
   # --- Timeout reached (loop exhausted without attended/ended) ---
