@@ -117,8 +117,7 @@ https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox
 |-------|----------|-------------|
 | Doorbell sensor | Yes | Your `binary_sensor.duox_doorbell_*` entity. |
 | Camera entity | No | `camera.duox_doorbell_camera` for snapshot in notifications. |
-| Notify device 1 | Yes | Your phone (must have the HA Companion App). |
-| Notify device 2-3 | No | Additional phones to notify. |
+| Devices to notify | Yes | Select one or more phones (must have the HA Companion App). |
 | Intercom dashboard path | No | Dashboard path for the tap action (default: `/dashboard-doorbell/0`). |
 | Auto-connect on tap | No | Start video feed automatically when tapping the notification (default: on). |
 | Timeout | No | Seconds to keep ringing before marking as missed (default: 90). |

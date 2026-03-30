@@ -31,28 +31,13 @@ blueprint:
       selector:
         text:
 
-    notify_device_1:
-      name: Notify device 1
-      description: First mobile device to notify (must have the HA Companion App).
+    notify_devices:
+      name: Devices to notify
+      description: Mobile devices to send notifications to (must have the HA Companion App).
       selector:
         device:
           integration: mobile_app
-
-    notify_device_2:
-      name: Notify device 2 (optional)
-      description: Second mobile device to notify.
-      default: {}
-      selector:
-        device:
-          integration: mobile_app
-
-    notify_device_3:
-      name: Notify device 3 (optional)
-      description: Third mobile device to notify.
-      default: {}
-      selector:
-        device:
-          integration: mobile_app
+          multiple: true
 
     autoconnect:
       name: Auto-connect on tap
@@ -104,66 +89,28 @@ variables:
     {{ '/api/camera_proxy/' ~ cam if cam else '' }}
   timeout_s: !input timeout_seconds
   interval_s: !input ring_interval
-  dev1: !input notify_device_1
-  dev2: !input notify_device_2
-  dev3: !input notify_device_3
+  devices: !input notify_devices
   max_rings: "{{ (timeout_s / interval_s) | int }}"
 
 action:
   # --- Initial ring notification ---
-  - parallel:
-      - device_id: !input notify_device_1
-        domain: mobile_app
-        type: notify
-        title: "Doorbell"
-        message: "Someone is at the door"
-        data:
-          clickAction: "{{ click_action }}"
-          tag: doorbell
-          channel: doorbell
-          importance: high
-          ttl: 0
-          priority: high
-          image: "{{ image_url }}"
-          persistent: true
-
-  - if:
-      - condition: template
-        value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
-    then:
-      - device_id: !input notify_device_2
-        domain: mobile_app
-        type: notify
-        title: "Doorbell"
-        message: "Someone is at the door"
-        data:
-          clickAction: "{{ click_action }}"
-          tag: doorbell
-          channel: doorbell
-          importance: high
-          ttl: 0
-          priority: high
-          image: "{{ image_url }}"
-          persistent: true
-
-  - if:
-      - condition: template
-        value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
-    then:
-      - device_id: !input notify_device_3
-        domain: mobile_app
-        type: notify
-        title: "Doorbell"
-        message: "Someone is at the door"
-        data:
-          clickAction: "{{ click_action }}"
-          tag: doorbell
-          channel: doorbell
-          importance: high
-          ttl: 0
-          priority: high
-          image: "{{ image_url }}"
-          persistent: true
+  - repeat:
+      for_each: "{{ devices }}"
+      sequence:
+        - device_id: "{{ repeat.item }}"
+          domain: mobile_app
+          type: notify
+          title: "Doorbell"
+          message: "Someone is at the door"
+          data:
+            clickAction: "{{ click_action }}"
+            tag: doorbell
+            channel: doorbell
+            importance: high
+            ttl: 0
+            priority: high
+            image: "{{ image_url }}"
+            persistent: true
 
   # --- Repeat ring loop ---
   - repeat:
@@ -185,51 +132,21 @@ action:
                 - condition: template
                   value_template: "{{ wait.trigger is not none and wait.trigger.id == 'attended' }}"
               sequence:
-                - parallel:
-                    - device_id: !input notify_device_1
-                      domain: mobile_app
-                      type: notify
-                      title: "Call answered"
-                      message: "Call was answered on another device"
-                      data:
-                        clickAction: "{{ dashboard }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: default
-                        persistent: false
-                        timeout: 30
-                - if:
-                    - condition: template
-                      value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
-                  then:
-                    - device_id: !input notify_device_2
-                      domain: mobile_app
-                      type: notify
-                      title: "Call answered"
-                      message: "Call was answered on another device"
-                      data:
-                        clickAction: "{{ dashboard }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: default
-                        persistent: false
-                        timeout: 30
-                - if:
-                    - condition: template
-                      value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
-                  then:
-                    - device_id: !input notify_device_3
-                      domain: mobile_app
-                      type: notify
-                      title: "Call answered"
-                      message: "Call was answered on another device"
-                      data:
-                        clickAction: "{{ dashboard }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: default
-                        persistent: false
-                        timeout: 30
+                - repeat:
+                    for_each: "{{ devices }}"
+                    sequence:
+                      - device_id: "{{ repeat.item }}"
+                        domain: mobile_app
+                        type: notify
+                        title: "Call answered"
+                        message: "Call was answered on another device"
+                        data:
+                          clickAction: "{{ dashboard }}"
+                          tag: doorbell
+                          channel: doorbell
+                          importance: default
+                          persistent: false
+                          timeout: 30
                 - stop: "Call attended"
 
             # Call ended (no one picked up)
@@ -237,150 +154,56 @@ action:
                 - condition: template
                   value_template: "{{ wait.trigger is not none and wait.trigger.id == 'ended' }}"
               sequence:
-                - parallel:
-                    - device_id: !input notify_device_1
-                      domain: mobile_app
-                      type: notify
-                      title: "Missed call"
-                      message: "You missed a doorbell ring"
-                      data:
-                        clickAction: "{{ dashboard }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: default
-                        image: "{{ image_url }}"
-                        persistent: false
-                - if:
-                    - condition: template
-                      value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
-                  then:
-                    - device_id: !input notify_device_2
-                      domain: mobile_app
-                      type: notify
-                      title: "Missed call"
-                      message: "You missed a doorbell ring"
-                      data:
-                        clickAction: "{{ dashboard }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: default
-                        image: "{{ image_url }}"
-                        persistent: false
-                - if:
-                    - condition: template
-                      value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
-                  then:
-                    - device_id: !input notify_device_3
-                      domain: mobile_app
-                      type: notify
-                      title: "Missed call"
-                      message: "You missed a doorbell ring"
-                      data:
-                        clickAction: "{{ dashboard }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: default
-                        image: "{{ image_url }}"
-                        persistent: false
+                - repeat:
+                    for_each: "{{ devices }}"
+                    sequence:
+                      - device_id: "{{ repeat.item }}"
+                        domain: mobile_app
+                        type: notify
+                        title: "Missed call"
+                        message: "You missed a doorbell ring"
+                        data:
+                          clickAction: "{{ dashboard }}"
+                          tag: doorbell
+                          channel: doorbell
+                          importance: default
+                          image: "{{ image_url }}"
+                          persistent: false
                 - stop: "Call ended"
 
           # No trigger fired — re-ring
           default:
-            - parallel:
-                - device_id: !input notify_device_1
-                  domain: mobile_app
-                  type: notify
-                  title: "Doorbell"
-                  message: "Someone is at the door (ring {{ repeat.index + 1 }})"
-                  data:
-                    clickAction: "{{ click_action }}"
-                    tag: doorbell
-                    channel: doorbell
-                    importance: high
-                    ttl: 0
-                    priority: high
-                    image: "{{ image_url }}"
-                    persistent: true
-            - if:
-                - condition: template
-                  value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
-              then:
-                - device_id: !input notify_device_2
-                  domain: mobile_app
-                  type: notify
-                  title: "Doorbell"
-                  message: "Someone is at the door (ring {{ repeat.index + 1 }})"
-                  data:
-                    clickAction: "{{ click_action }}"
-                    tag: doorbell
-                    channel: doorbell
-                    importance: high
-                    ttl: 0
-                    priority: high
-                    image: "{{ image_url }}"
-                    persistent: true
-            - if:
-                - condition: template
-                  value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
-              then:
-                - device_id: !input notify_device_3
-                  domain: mobile_app
-                  type: notify
-                  title: "Doorbell"
-                  message: "Someone is at the door (ring {{ repeat.index + 1 }})"
-                  data:
-                    clickAction: "{{ click_action }}"
-                    tag: doorbell
-                    channel: doorbell
-                    importance: high
-                    ttl: 0
-                    priority: high
-                    image: "{{ image_url }}"
-                    persistent: true
+            - repeat:
+                for_each: "{{ devices }}"
+                sequence:
+                  - device_id: "{{ repeat.item }}"
+                    domain: mobile_app
+                    type: notify
+                    title: "Doorbell"
+                    message: "Someone is at the door (ring {{ repeat.index + 1 }})"
+                    data:
+                      clickAction: "{{ click_action }}"
+                      tag: doorbell
+                      channel: doorbell
+                      importance: high
+                      ttl: 0
+                      priority: high
+                      image: "{{ image_url }}"
+                      persistent: true
 
   # --- Timeout reached (loop exhausted without attended/ended) ---
-  - parallel:
-      - device_id: !input notify_device_1
-        domain: mobile_app
-        type: notify
-        title: "Missed call"
-        message: "You missed a doorbell ring"
-        data:
-          clickAction: "{{ dashboard }}"
-          tag: doorbell
-          channel: doorbell
-          importance: default
-          image: "{{ image_url }}"
-          persistent: false
-  - if:
-      - condition: template
-        value_template: "{{ dev2 is mapping and dev2|length > 0 or dev2 is string and dev2|length > 0 }}"
-    then:
-      - device_id: !input notify_device_2
-        domain: mobile_app
-        type: notify
-        title: "Missed call"
-        message: "You missed a doorbell ring"
-        data:
-          clickAction: "{{ dashboard }}"
-          tag: doorbell
-          channel: doorbell
-          importance: default
-          image: "{{ image_url }}"
-          persistent: false
-  - if:
-      - condition: template
-        value_template: "{{ dev3 is mapping and dev3|length > 0 or dev3 is string and dev3|length > 0 }}"
-    then:
-      - device_id: !input notify_device_3
-        domain: mobile_app
-        type: notify
-        title: "Missed call"
-        message: "You missed a doorbell ring"
-        data:
-          clickAction: "{{ dashboard }}"
-          tag: doorbell
-          channel: doorbell
-          importance: default
-          image: "{{ image_url }}"
-          persistent: false
+  - repeat:
+      for_each: "{{ devices }}"
+      sequence:
+        - device_id: "{{ repeat.item }}"
+          domain: mobile_app
+          type: notify
+          title: "Missed call"
+          message: "You missed a doorbell ring"
+          data:
+            clickAction: "{{ dashboard }}"
+            tag: doorbell
+            channel: doorbell
+            importance: default
+            image: "{{ image_url }}"
+            persistent: false
