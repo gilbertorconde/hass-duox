@@ -580,7 +580,15 @@ class DuoxIntercomCard extends HTMLElement {
 
   _fmtTime(timestamp) {
     try {
-      const d = new Date(typeof timestamp === "number" ? timestamp : parseInt(timestamp, 10));
+      let d;
+      if (typeof timestamp === "number") {
+        d = new Date(timestamp);
+      } else if (typeof timestamp === "string" && /^\d+$/.test(timestamp)) {
+        d = new Date(parseInt(timestamp, 10));
+      } else {
+        d = new Date(timestamp);
+      }
+      if (isNaN(d.getTime())) return "";
       const now = Date.now();
       const diff = now - d.getTime();
       if (diff < 60000) return "Just now";
