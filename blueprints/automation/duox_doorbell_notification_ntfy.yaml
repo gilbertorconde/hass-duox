@@ -23,7 +23,7 @@ blueprint:
 
     dashboard_path:
       name: Intercom dashboard path
-      description: URL opened when tapping the ntfy notification.
+      description: Dashboard path or URL opened when tapping the ntfy notification.
       default: /dashboard-doorbell/0
       selector:
         text:
@@ -46,17 +46,6 @@ blueprint:
           step: 5
           unit_of_measurement: s
 
-    ring_interval:
-      name: Ring interval (seconds)
-      description: Seconds between repeated ring updates.
-      default: 8
-      selector:
-        number:
-          min: 3
-          max: 30
-          step: 1
-          unit_of_measurement: s
-
 mode: restart
 max_exceeded: silent
 
@@ -68,14 +57,22 @@ trigger:
 
 variables:
   doorbell_sensor: !input doorbell_entity
-  notify_target: !input ntfy_notifier
   dashboard: !input dashboard_path
   auto: !input autoconnect
+  click_base: >
+    {% set dash = dashboard | trim %}
+    {% if '://' in dash %}
+      {{ dash }}
+    {% else %}
+      {{ 'homeassistant://navigate' ~ (dash if dash.startswith('/') else '/' ~ dash) }}
+    {% endif %}
   click_action: >
-    {{ dashboard ~ ('?autoconnect=1' if auto else '') }}
+    {% if auto %}
+      {{ click_base ~ ('&autoconnect=1' if '?' in click_base else '?autoconnect=1') }}
+    {% else %}
+      {{ click_base }}
+    {% endif %}
   timeout_s: !input timeout_seconds
-  interval_s: !input ring_interval
-  max_rings: "{{ (timeout_s / interval_s) | int }}"
   seq_id: >
     {{ 'duox_' ~ (doorbell_sensor | replace('.', '_')) ~ '_' ~ now().strftime('%Y%m%d%H%M%S') }}
 
@@ -94,101 +91,72 @@ action:
         - doorbell
       sequence_id: "{{ seq_id }}"
 
-  # --- Repeat ring loop ---
-  - repeat:
-      count: "{{ max_rings }}"
-      sequence:
-        - variables:
-            ring_num: "{{ repeat.index + 1 }}"
+  # --- Wait for attended/ended/clear, or timeout ---
+  - wait_for_trigger:
+      - platform: event
+        event_type: duox_call_attended
+        id: attended
+      - platform: event
+        event_type: duox_call_ended
+        id: ended
+      - platform: state
+        entity_id: !input doorbell_entity
+        from: "on"
+        to: "off"
+        id: cleared
+    timeout:
+      seconds: "{{ timeout_s }}"
 
-        - wait_for_trigger:
-            - platform: event
-              event_type: duox_call_attended
-              id: attended
-            - platform: event
-              event_type: duox_call_ended
-              id: ended
-            - platform: state
-              entity_id: !input doorbell_entity
-              from: "on"
-              to: "off"
-              id: cleared
-          timeout:
-            seconds: "{{ interval_s }}"
+  - choose:
+      # Call answered
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger is not none and wait.trigger.id == 'attended' }}"
+        sequence:
+          - action: ntfy.publish
+            target:
+              entity_id: !input ntfy_notifier
+            data:
+              title: "Call answered"
+              message: "Call was answered"
+              priority: "3"
+              click: "{{ click_base }}"
+              sequence_id: "{{ seq_id }}"
+          - stop: "Call attended"
 
-        - choose:
-            # Call answered
-            - conditions:
-                - condition: template
-                  value_template: "{{ wait.trigger is not none and wait.trigger.id == 'attended' }}"
-              sequence:
-                - action: ntfy.publish
-                  target:
-                    entity_id: !input ntfy_notifier
-                  data:
-                    title: "Call answered"
-                    message: "Call was answered"
-                    priority: "3"
-                    click: "{{ dashboard }}"
-                    sequence_id: "{{ seq_id }}"
-                - stop: "Call attended"
+      # Call ended (no one picked up)
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger is not none and wait.trigger.id == 'ended' }}"
+        sequence:
+          - action: ntfy.publish
+            target:
+              entity_id: !input ntfy_notifier
+            data:
+              title: "Missed call"
+              message: "You missed a doorbell ring"
+              priority: "3"
+              click: "{{ click_base }}"
+              sequence_id: "{{ seq_id }}"
+          - stop: "Call ended"
 
-            # Call ended (no one picked up)
-            - conditions:
-                - condition: template
-                  value_template: "{{ wait.trigger is not none and wait.trigger.id == 'ended' }}"
-              sequence:
-                - action: ntfy.publish
-                  target:
-                    entity_id: !input ntfy_notifier
-                  data:
-                    title: "Missed call"
-                    message: "You missed a doorbell ring"
-                    priority: "3"
-                    click: "{{ dashboard }}"
-                    sequence_id: "{{ seq_id }}"
-                - stop: "Call ended"
+      # Doorbell state already cleared (race-safe fallback)
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger is not none and wait.trigger.id == 'cleared' }}"
+        sequence:
+          - action: ntfy.publish
+            target:
+              entity_id: !input ntfy_notifier
+            data:
+              title: "Call ended"
+              message: "Doorbell call has ended"
+              priority: "3"
+              click: "{{ click_base }}"
+              sequence_id: "{{ seq_id }}"
+          - stop: "Doorbell state cleared"
 
-            # Doorbell state already cleared (race-safe fallback)
-            - conditions:
-                - condition: template
-                  value_template: "{{ wait.trigger is not none and wait.trigger.id == 'cleared' }}"
-              sequence:
-                - action: ntfy.publish
-                  target:
-                    entity_id: !input ntfy_notifier
-                  data:
-                    title: "Call ended"
-                    message: "Doorbell call has ended"
-                    priority: "3"
-                    click: "{{ dashboard }}"
-                    sequence_id: "{{ seq_id }}"
-                - stop: "Doorbell state cleared"
-
-          # No trigger fired — re-ring
-          default:
-            - choose:
-                - conditions:
-                    - condition: state
-                      entity_id: !input doorbell_entity
-                      state: "on"
-                  sequence:
-                    - action: ntfy.publish
-                      target:
-                        entity_id: !input ntfy_notifier
-                      data:
-                        title: "Doorbell"
-                        message: "Someone is at the door (ring {{ ring_num }})"
-                        priority: "5"
-                        click: "{{ click_action }}"
-                        tags:
-                          - rotating_light
-                          - doorbell
-                        sequence_id: "{{ seq_id }}"
-              default:
-                - stop: "Doorbell no longer active"
-
-  # --- Timeout reached (loop exhausted without attended/ended) ---
+  # --- Timeout reached without attended/ended/clear ---
   - choose:
       - conditions:
           - condition: state
@@ -202,5 +170,5 @@ action:
               title: "Missed call"
               message: "You missed a doorbell ring"
               priority: "3"
-              click: "{{ dashboard }}"
+              click: "{{ click_base }}"
               sequence_id: "{{ seq_id }}"

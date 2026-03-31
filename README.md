@@ -142,6 +142,14 @@ If you prefer using the [ntfy integration](https://www.home-assistant.io/integra
 - At least one ntfy topic configured (official `https://ntfy.sh` or a self-hosted service).
 - A resulting ntfy notify entity available in HA (for example `notify.<your_topic_name>`).
 
+**How to add an ntfy topic in Home Assistant:**
+1. Go to **Settings** > **Devices & Services**.
+2. Open the **ntfy** integration.
+3. Click **Add topic**.
+4. If prompted, select your ntfy service.
+5. Choose **Enter topic** and type your topic name (or **Generate topic name**).
+6. Save. HA will create a notify entity like `notify.<topic_name>`.
+
 Import the ntfy blueprint:
 
 [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox_doorbell_notification_ntfy.yaml)
@@ -157,14 +165,13 @@ Create automation from **Duox Doorbell Notification (ntfy)** and set:
 |-------|----------|-------------|
 | Doorbell sensor | Yes | Your `binary_sensor.duox_doorbell_*` entity. |
 | ntfy notify entity | Yes | Notify entity created by ntfy integration (`notify.*`). |
-| Intercom dashboard path | No | URL/path opened when tapping the notification. |
+| Intercom dashboard path | No | Dashboard path or full URL opened when tapping the notification. Relative paths are converted to `homeassistant://navigate/...`. |
 | Auto-connect on tap | No | Appends `autoconnect=1` to click URL. |
 | Timeout | No | Seconds to keep ringing before missed. |
-| Ring interval | No | Seconds between ring updates. |
 
 **Behavior notes (ntfy):**
 - Uses a stable `sequence_id` per ring session for update/replace semantics.
-- Sends high-priority ring updates and lower-priority attended/missed transitions.
+- Sends one high-priority ring notification, then a single attended/ended/missed transition update.
 - Preserves race-safe lifecycle handling (doorbell off guard, no false missed when call already cleared).
 
 ### Native vs ntfy (choose one)
