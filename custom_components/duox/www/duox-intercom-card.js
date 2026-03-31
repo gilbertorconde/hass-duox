@@ -100,6 +100,7 @@ class DuoxIntercomCard extends HTMLElement {
     this._callHistory = null;
     this._historyLoading = false;
     this._thumbCache = {};
+    this._photoRequestSeq = 0;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -538,23 +539,52 @@ class DuoxIntercomCard extends HTMLElement {
     }
   }
 
+  _closePhotoViewer() {
+    this._photoRequestSeq += 1;
+    this.shadowRoot?.querySelectorAll(".photo-viewer").forEach((el) => el.remove());
+  }
+
+  _ensurePhotoViewer(vw) {
+    let viewer = vw.querySelector(".photo-viewer");
+    if (!viewer) {
+      viewer = document.createElement("div");
+      viewer.className = "photo-viewer";
+      viewer.innerHTML = `<button class="pv-close">\u00d7</button><div class="spinner"></div>`;
+      viewer.addEventListener("click", () => this._closePhotoViewer());
+      vw.appendChild(viewer);
+    }
+
+    const closeBtn = viewer.querySelector(".pv-close");
+    closeBtn?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this._closePhotoViewer();
+    });
+
+    return viewer;
+  }
+
+  _setPhotoViewerContent(viewer, src) {
+    if (src) {
+      viewer.innerHTML = `<button class="pv-close">\u00d7</button><img src="${src}" alt="Call photo"/>`;
+    } else {
+      viewer.innerHTML = `<button class="pv-close">\u00d7</button><div class="spinner"></div>`;
+    }
+    const closeBtn = viewer.querySelector(".pv-close");
+    closeBtn?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this._closePhotoViewer();
+    });
+  }
+
   async _showPhoto(photoId) {
     const cached = this._thumbCache?.[photoId];
     const vw = this.shadowRoot.getElementById("vw");
     if (!vw) return;
-
-    vw.querySelector(".photo-viewer")?.remove();
-
-    const viewer = document.createElement("div");
-    viewer.className = "photo-viewer";
-    viewer.innerHTML = `<button class="pv-close">\u00d7</button>${
-      cached
-        ? `<img src="${cached}" alt="Call photo"/>`
-        : `<div class="spinner"></div>`
-    }`;
-    vw.appendChild(viewer);
-
-    viewer.addEventListener("click", () => viewer.remove());
+    const seq = ++this._photoRequestSeq;
+    const viewer = this._ensurePhotoViewer(vw);
+    this._setPhotoViewerContent(viewer, cached || null);
 
     if (!cached) {
       try {
@@ -567,13 +597,15 @@ class DuoxIntercomCard extends HTMLElement {
           const src = `data:image/jpeg;base64,${result.image_b64}`;
           this._thumbCache = this._thumbCache || {};
           this._thumbCache[photoId] = src;
-          viewer.innerHTML = `<button class="pv-close">\u00d7</button><img src="${src}" alt="Call photo"/>`;
-          viewer.addEventListener("click", () => viewer.remove());
+          if (seq !== this._photoRequestSeq) return;
+          this._setPhotoViewerContent(viewer, src);
         } else {
-          viewer.remove();
+          if (seq !== this._photoRequestSeq) return;
+          this._closePhotoViewer();
         }
       } catch (_) {
-        viewer.remove();
+        if (seq !== this._photoRequestSeq) return;
+        this._closePhotoViewer();
       }
     }
   }
@@ -711,6 +743,16 @@ class DuoxIntercomCard extends HTMLElement {
       this._micProducer = await this._sendTransport.produce({ track: audioTrack });
 
       this._setState("call");
+      this._hass?.callWS({
+        type: "duox/attended",
+        entry_id: this._entryId,
+        device_id: this._callData?.device_id || "",
+        access_door_key: this._callData?.access_door_key || "",
+        call_as: this._callData?.call_as || "",
+        room_id: this._callData?.room_id || "",
+      }).catch((err) => {
+        console.debug("[duox-intercom] attended mirror error", err);
+      });
 
     } catch (e) {
       console.error("[duox-intercom] pickup error", e);

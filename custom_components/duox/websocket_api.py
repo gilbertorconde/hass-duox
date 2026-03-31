@@ -10,8 +10,9 @@ import voluptuous as vol
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_CALL_ATTENDED, SIGNAL_CALL_ENDED
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ async def async_register_ws_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_call_history)
     websocket_api.async_register_command(hass, ws_call_photo)
     websocket_api.async_register_command(hass, ws_hangup)
+    websocket_api.async_register_command(hass, ws_attended)
 
 
 @websocket_api.websocket_command(
@@ -258,4 +260,55 @@ def ws_hangup(
         data["active_call"] = None
         LOGGER.debug("active_call cleared by hangup")
 
+    connection.send_result(msg["id"], {"ok": True})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "duox/attended",
+        vol.Required("entry_id"): str,
+        vol.Optional("device_id"): str,
+        vol.Optional("access_door_key"): str,
+        vol.Optional("call_as"): str,
+        vol.Optional("room_id"): str,
+    }
+)
+@callback
+def ws_attended(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Mirror CallAttend effects when HA user picks up via WebRTC."""
+    entry_id = msg["entry_id"]
+    data = hass.data.get(DOMAIN, {}).get(entry_id)
+    if not data:
+        connection.send_error(msg["id"], "not_found", "Integration entry not found")
+        return
+
+    active_call = data.get("active_call") or {}
+    device_id = msg.get("device_id") or active_call.get("device_id")
+    access_door_key = msg.get("access_door_key") or active_call.get("access_door_key", "")
+    call_as = msg.get("call_as") or active_call.get("call_as", "")
+    room_id = msg.get("room_id") or active_call.get("room_id", "")
+
+    if not device_id:
+        connection.send_result(msg["id"], {"ok": True, "skipped": "no_device"})
+        return
+
+    data["active_call"] = None
+    async_dispatcher_send(hass, SIGNAL_CALL_ATTENDED.format(device_id))
+    async_dispatcher_send(hass, SIGNAL_CALL_ENDED.format(device_id))
+    hass.bus.async_fire(
+        f"{DOMAIN}_call_attended",
+        {
+            "device_id": device_id,
+            "access_door_key": access_door_key,
+            "call_as": call_as,
+            "room_id": room_id,
+            "notification_type": "CallAttend",
+            "source": "ha_websocket",
+        },
+    )
+    LOGGER.debug("ws_attended emitted CallAttend mirror for device=%s", device_id)
     connection.send_result(msg["id"], {"ok": True})

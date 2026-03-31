@@ -45,6 +45,7 @@ from .fermax_api import FermaxClient
 LOGGER = logging.getLogger(__name__)
 
 FCM_CREDENTIALS_STORAGE_VERSION = 4
+_SENSITIVE_HINTS = ("token", "auth", "secret", "password", "key")
 
 GCM_REGISTER_URL = "https://android.clients.google.com/c2dm/register3"
 FIREBASE_INSTALL_URL = (
@@ -58,6 +59,28 @@ FIREBASE_CLIENT_HEADER = (
     "fire-installations/17.0.0 fire-fcm/22.0.0 android-platform/ "
     "kotlin/1.9.23 android-target-sdk/34"
 )
+
+
+def _redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return payload copy with sensitive values redacted for logs."""
+    redacted: dict[str, Any] = {}
+    for key in sorted(payload):
+        value = payload.get(key)
+        key_l = key.lower()
+        if any(hint in key_l for hint in _SENSITIVE_HINTS):
+            if isinstance(value, str) and len(value) > 10:
+                redacted[key] = f"{value[:4]}...{value[-4:]}"
+            elif value is None:
+                redacted[key] = None
+            else:
+                redacted[key] = "[redacted]"
+            continue
+
+        if isinstance(value, str) and len(value) > 300:
+            redacted[key] = f"{value[:120]}...[truncated]...{value[-40:]}"
+        else:
+            redacted[key] = value
+    return redacted
 
 
 def _build_package_cert() -> str:
@@ -368,14 +391,23 @@ class FermaxNotificationListener:
         obj: Any = None,
     ) -> None:
         """Handle incoming FCM notification."""
-        LOGGER.debug("FCM notification received: %s", notification)
-
         notif_type = notification.get("FermaxNotificationType")
         device_id = notification.get("DeviceId")
 
         if not notif_type or not device_id:
-            LOGGER.debug("Ignoring non-Fermax notification: %s", notification)
+            LOGGER.debug(
+                "Ignoring non-Fermax notification keys=%s",
+                sorted(notification.keys()),
+            )
             return
+
+        LOGGER.info(
+            "Fermax FCM received type=%s device=%s keys=%s",
+            notif_type,
+            device_id,
+            sorted(notification.keys()),
+        )
+        LOGGER.debug("Fermax FCM payload: %s", _redact_payload(notification))
 
         access_door_key = notification.get("AccessDoorKey", "")
         call_as = notification.get("CallAs", "")
@@ -387,6 +419,10 @@ class FermaxNotificationListener:
             "call_as": call_as,
             "room_id": room_id,
             "notification_type": notif_type,
+            "title": notification.get("NotificationTitle", ""),
+            "body": notification.get("NotificationBody", ""),
+            "title_key": notification.get("NotificationTitleLocKey", ""),
+            "body_key": notification.get("NotificationBodyLocKey", ""),
         }
 
         if notif_type in ("Call", "Autoon"):

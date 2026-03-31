@@ -84,6 +84,8 @@ logger:
     custom_components.duox: debug
 ```
 
+With `debug` enabled, the integration logs Fermax FCM payload keys and a redacted payload snapshot. This helps troubleshoot call lifecycle races and discover new push fields without exposing full tokens in logs.
+
 ### Mobile Notifications
 
 Get push notifications on your phone when someone rings the doorbell — repeated ringing like a phone call, with auto-connect to the live feed. Handles the full call lifecycle: ring, answered on another device, missed, and ended.
@@ -96,7 +98,7 @@ Get push notifications on your phone when someone rings the doorbell — repeate
 2. Set Title: `Doorbell`, Icon: `mdi:doorbell-video`, URL: `doorbell`.
 3. Open the new dashboard, edit it, and add the intercom card (see [Intercom Card Setup](#intercom-card-setup) above).
 
-#### 2. Import the Blueprint
+#### 2. Import the Blueprint (Native mobile_app)
 
 Click the button below to import the doorbell notification blueprint:
 
@@ -130,6 +132,47 @@ https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox
 After receiving the first notification, go to your phone's **Settings** > **Apps** > **Home Assistant** > **Notifications** > **doorbell** channel and set a distinctive ringtone.
 
 **How it works:** The blueprint sends a high-priority notification that repeats every N seconds (like a phone call ringing). If someone answers on another device, the notification is replaced with "Call answered". If no one answers, it becomes "Missed call". Tapping the ringing notification opens your intercom dashboard and auto-connects to the live video feed.
+
+#### 5. Optional: Use the ntfy Blueprint (Alternative to native mobile_app)
+
+If you prefer using the [ntfy integration](https://www.home-assistant.io/integrations/ntfy/) for notification transport, you can use a second blueprint while keeping the native one unchanged.
+
+**Prerequisites:**
+- ntfy integration added in Home Assistant.
+- At least one ntfy topic configured (official `https://ntfy.sh` or a self-hosted service).
+- A resulting ntfy notify entity available in HA (for example `notify.<your_topic_name>`).
+
+Import the ntfy blueprint:
+
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox_doorbell_notification_ntfy.yaml)
+
+Or paste:
+```
+https://github.com/gilbertorconde/hass-duox/blob/main/blueprints/automation/duox_doorbell_notification_ntfy.yaml
+```
+
+Create automation from **Duox Doorbell Notification (ntfy)** and set:
+
+| Input | Required | Description |
+|-------|----------|-------------|
+| Doorbell sensor | Yes | Your `binary_sensor.duox_doorbell_*` entity. |
+| ntfy notify entity | Yes | Notify entity created by ntfy integration (`notify.*`). |
+| Intercom dashboard path | No | URL/path opened when tapping the notification. |
+| Auto-connect on tap | No | Appends `autoconnect=1` to click URL. |
+| Timeout | No | Seconds to keep ringing before missed. |
+| Ring interval | No | Seconds between ring updates. |
+
+**Behavior notes (ntfy):**
+- Uses a stable `sequence_id` per ring session for update/replace semantics.
+- Sends high-priority ring updates and lower-priority attended/missed transitions.
+- Preserves race-safe lifecycle handling (doorbell off guard, no false missed when call already cleared).
+
+### Native vs ntfy (choose one)
+
+| Option | Transport | Best when | Trade-offs |
+|--------|-----------|-----------|-----------|
+| Native blueprint | `notify.mobile_app_*` | You want simplest setup and direct Companion behavior | Fewer advanced lifecycle controls |
+| ntfy blueprint | `ntfy.publish` / `ntfy.clear` | You want stronger control over update/dismiss flow and topic-based routing | Requires ntfy integration/app setup |
 
 ## How It Works
 

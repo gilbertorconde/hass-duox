@@ -80,13 +80,13 @@ trigger:
     to: "on"
 
 variables:
+  doorbell_sensor: !input doorbell_entity
+  notif_tag: >
+    {{ 'duox_' ~ (doorbell_sensor | replace('.', '_')) }}
   dashboard: !input dashboard_path
   auto: !input autoconnect
   click_action: >
     {{ dashboard ~ ('?autoconnect=1' if auto else '') }}
-  cam: !input camera_entity
-  image_url: >
-    {{ '/api/camera_proxy/' ~ cam if cam else '' }}
   timeout_s: !input timeout_seconds
   interval_s: !input ring_interval
   devices: !input notify_devices
@@ -104,12 +104,11 @@ action:
             message: "Someone is at the door"
             data:
               clickAction: "{{ click_action }}"
-              tag: doorbell
+              tag: "{{ notif_tag }}"
               channel: doorbell
               importance: high
               ttl: 0
               priority: high
-              image: "{{ image_url }}"
               persistent: true
 
   # --- Repeat ring loop ---
@@ -126,6 +125,11 @@ action:
             - platform: event
               event_type: duox_call_ended
               id: ended
+            - platform: state
+              entity_id: !input doorbell_entity
+              from: "on"
+              to: "off"
+              id: cleared
           timeout:
             seconds: "{{ interval_s }}"
 
@@ -142,10 +146,10 @@ action:
                           notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify | replace('-', '_') }}
                         data:
                           title: "Call answered"
-                          message: "Call was answered on another device"
+                          message: "Call was answered"
                           data:
                             clickAction: "{{ dashboard }}"
-                            tag: doorbell
+                            tag: "{{ notif_tag }}"
                             channel: doorbell
                             importance: default
                             persistent: false
@@ -167,46 +171,79 @@ action:
                           message: "You missed a doorbell ring"
                           data:
                             clickAction: "{{ dashboard }}"
-                            tag: doorbell
+                            tag: "{{ notif_tag }}"
                             channel: doorbell
                             importance: default
-                            image: "{{ image_url }}"
                             persistent: false
                 - stop: "Call ended"
 
+            # Doorbell state already cleared (event race-safe fallback)
+            - conditions:
+                - condition: template
+                  value_template: "{{ wait.trigger is not none and wait.trigger.id == 'cleared' }}"
+              sequence:
+                - repeat:
+                    for_each: "{{ devices }}"
+                    sequence:
+                      - action: >-
+                          notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify | replace('-', '_') }}
+                        data:
+                          title: "Call ended"
+                          message: "Doorbell call has ended"
+                          data:
+                            clickAction: "{{ dashboard }}"
+                            tag: "{{ notif_tag }}"
+                            channel: doorbell
+                            importance: default
+                            persistent: false
+                            timeout: 30
+                - stop: "Doorbell state cleared"
+
           # No trigger fired — re-ring
           default:
-            - repeat:
-                for_each: "{{ devices }}"
-                sequence:
-                  - action: >-
-                      notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify | replace('-', '_') }}
-                    data:
-                      title: "Doorbell"
-                      message: "Someone is at the door (ring {{ ring_num }})"
-                      data:
-                        clickAction: "{{ click_action }}"
-                        tag: doorbell
-                        channel: doorbell
-                        importance: high
-                        ttl: 0
-                        priority: high
-                        image: "{{ image_url }}"
-                        persistent: true
+            - choose:
+                - conditions:
+                    - condition: state
+                      entity_id: !input doorbell_entity
+                      state: "on"
+                  sequence:
+                    - repeat:
+                        for_each: "{{ devices }}"
+                        sequence:
+                          - action: >-
+                              notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify | replace('-', '_') }}
+                            data:
+                              title: "Doorbell"
+                              message: "Someone is at the door (ring {{ ring_num }})"
+                              data:
+                                clickAction: "{{ click_action }}"
+                                tag: "{{ notif_tag }}"
+                                channel: doorbell
+                                importance: high
+                                ttl: 0
+                                priority: high
+                                persistent: true
+              default:
+                - stop: "Doorbell no longer active"
 
   # --- Timeout reached (loop exhausted without attended/ended) ---
-  - repeat:
-      for_each: "{{ devices }}"
-      sequence:
-        - action: >-
-            notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify | replace('-', '_') }}
-          data:
-            title: "Missed call"
-            message: "You missed a doorbell ring"
-            data:
-              clickAction: "{{ dashboard }}"
-              tag: doorbell
-              channel: doorbell
-              importance: default
-              image: "{{ image_url }}"
-              persistent: false
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input doorbell_entity
+            state: "on"
+        sequence:
+          - repeat:
+              for_each: "{{ devices }}"
+              sequence:
+                - action: >-
+                    notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify | replace('-', '_') }}
+                  data:
+                    title: "Missed call"
+                    message: "You missed a doorbell ring"
+                    data:
+                      clickAction: "{{ dashboard }}"
+                      tag: "{{ notif_tag }}"
+                      channel: doorbell
+                      importance: default
+                      persistent: false
