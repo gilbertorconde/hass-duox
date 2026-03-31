@@ -167,6 +167,7 @@ Create automation from **Duox Doorbell Notification (ntfy)** and set:
 | ntfy notify entity | Yes | Notify entity created by ntfy integration (`notify.*`). |
 | Intercom dashboard path | No | Dashboard path or full URL opened when tapping the notification. Relative paths are converted to `homeassistant://navigate/...`. |
 | Auto-connect on tap | No | Appends `autoconnect=1` to click URL. |
+| Notification icon URL | No | Icon image URL shown by ntfy (default uses Home Assistant icon). Must be a full URL. |
 | Timeout | No | Seconds to keep ringing before missed. |
 
 **Behavior notes (ntfy):**

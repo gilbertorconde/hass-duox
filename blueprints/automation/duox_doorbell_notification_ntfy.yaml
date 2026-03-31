@@ -35,6 +35,13 @@ blueprint:
       selector:
         boolean:
 
+    notification_icon_url:
+      name: Notification icon URL
+      description: Image URL used as ntfy notification icon.
+      default: https://www.home-assistant.io/images/favicon-192x192.png
+      selector:
+        text:
+
     timeout_seconds:
       name: Timeout (seconds)
       description: Seconds to keep ringing before marking as missed.
@@ -59,6 +66,7 @@ variables:
   doorbell_sensor: !input doorbell_entity
   dashboard: !input dashboard_path
   auto: !input autoconnect
+  notif_icon: !input notification_icon_url
   click_base: >
     {% set dash = dashboard | trim %}
     {% if '://' in dash %}
@@ -86,6 +94,7 @@ action:
       message: "Someone is at the door"
       priority: "5"
       click: "{{ click_action }}"
+      icon: "{{ notif_icon }}"
       tags:
         - rotating_light
         - doorbell
@@ -121,6 +130,7 @@ action:
               message: "Call was answered"
               priority: "3"
               click: "{{ click_base }}"
+              icon: "{{ notif_icon }}"
               sequence_id: "{{ seq_id }}"
           - stop: "Call attended"
 
@@ -137,6 +147,7 @@ action:
               message: "You missed a doorbell ring"
               priority: "3"
               click: "{{ click_base }}"
+              icon: "{{ notif_icon }}"
               sequence_id: "{{ seq_id }}"
           - stop: "Call ended"
 
@@ -153,6 +164,7 @@ action:
               message: "Doorbell call has ended"
               priority: "3"
               click: "{{ click_base }}"
+              icon: "{{ notif_icon }}"
               sequence_id: "{{ seq_id }}"
           - stop: "Doorbell state cleared"
 
@@ -171,4 +183,5 @@ action:
               message: "You missed a doorbell ring"
               priority: "3"
               click: "{{ click_base }}"
+              icon: "{{ notif_icon }}"
               sequence_id: "{{ seq_id }}"
