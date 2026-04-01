@@ -796,11 +796,18 @@ class DuoxIntercomCard extends HTMLElement {
   async _unlock() {
     if (!this._hass || !this._lockEntity) return;
     try {
-      await this._hass.callService("lock", "open", {
+      await this._hass.callService("lock", "unlock", {
         entity_id: this._lockEntity,
       });
     } catch (e) {
-      console.error("[duox-intercom] unlock error", e);
+      // Some lock entities expose "open" instead of "unlock".
+      try {
+        await this._hass.callService("lock", "open", {
+          entity_id: this._lockEntity,
+        });
+      } catch (e2) {
+        console.error("[duox-intercom] unlock/open error", e2);
+      }
     }
   }
 
