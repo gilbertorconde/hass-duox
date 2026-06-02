@@ -118,11 +118,15 @@ async def ws_autoon(
         first_door.access_id.to_dict() if first_door else "none",
     )
 
-    try:
-        raw_pairings = await client.async_get_pairings_raw()
-        LOGGER.debug("autoon raw pairings: %s", raw_pairings)
-    except Exception:
-        LOGGER.debug("Could not fetch raw pairings for debug")
+    # Only hit the network for raw pairings when debug logging is enabled;
+    # the deviceId/accessId are already cached, so this is purely diagnostic
+    # and would otherwise add a round-trip of latency to every autoon.
+    if LOGGER.isEnabledFor(logging.DEBUG):
+        try:
+            raw_pairings = await client.async_get_pairings_raw()
+            LOGGER.debug("autoon raw pairings: %s", raw_pairings)
+        except Exception:
+            LOGGER.debug("Could not fetch raw pairings for debug")
 
     gcm_token = data.get("gcm_token", "")
     if not gcm_token:

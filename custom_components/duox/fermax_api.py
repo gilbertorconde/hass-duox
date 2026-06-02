@@ -1,6 +1,7 @@
 """Fermax Duox API Client."""
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 from base64 import b64decode
@@ -15,6 +16,10 @@ LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://pro-duoxme.fermax.io"
 AUTH_URL = "https://oauth-pro-duoxme.fermax.io/oauth/token"
+
+# Retry policy for transient errors (network failures, timeouts, HTTP >= 500).
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 1.0
 
 CLIENT_ID_SECRET_B64 = (
     "ZHB2N2lxejZlZTVtYXptMWlxOWR3MWQ0MnNseXV0NDhrajBtcDVmd"
@@ -291,36 +296,65 @@ class FermaxClient:
         headers["Authorization"] = f"Bearer {self._token_data['access_token']}"
         headers["Content-Type"] = "application/json"
 
-        try:
-            async with self._session.request(
-                method, url, headers=headers, **kwargs
-            ) as resp:
-                if resp.status == 401:
-                    LOGGER.info("Received 401, trying to refresh token")
-                    try:
-                        await self.async_refresh_token()
-                    except FermaxAuthError as err:
-                        raise ConfigEntryAuthFailed(
-                            f"Re-authentication required: {err}"
-                        ) from err
-                    headers["Authorization"] = (
-                        f"Bearer {self._token_data['access_token']}"
-                    )
-                    async with self._session.request(
-                        method, url, headers=headers, **kwargs
-                    ) as resp2:
-                        if resp2.status == 401:
+        last_error: FermaxConnectionError | None = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                async with self._session.request(
+                    method, url, headers=headers, **kwargs
+                ) as resp:
+                    if resp.status == 401:
+                        LOGGER.info("Received 401, trying to refresh token")
+                        try:
+                            await self.async_refresh_token()
+                        except FermaxAuthError as err:
                             raise ConfigEntryAuthFailed(
-                                "Authentication failed after refresh"
-                            )
-                        resp2.raise_for_status()
-                        return await self._parse_response(resp2)
+                                f"Re-authentication required: {err}"
+                            ) from err
+                        headers["Authorization"] = (
+                            f"Bearer {self._token_data['access_token']}"
+                        )
+                        async with self._session.request(
+                            method, url, headers=headers, **kwargs
+                        ) as resp2:
+                            if resp2.status == 401:
+                                raise ConfigEntryAuthFailed(
+                                    "Authentication failed after refresh"
+                                )
+                            resp2.raise_for_status()
+                            return await self._parse_response(resp2)
 
-                resp.raise_for_status()
-                return await self._parse_response(resp)
+                    if resp.status >= 500:
+                        # Transient server error: retry with backoff.
+                        last_error = FermaxConnectionError(
+                            f"Server error {resp.status}"
+                        )
+                    else:
+                        # 4xx errors are non-retryable and raise immediately.
+                        resp.raise_for_status()
+                        return await self._parse_response(resp)
 
-        except aiohttp.ClientError as err:
-            raise FermaxConnectionError(f"Request error: {err}") from err
+            except ConfigEntryAuthFailed:
+                raise
+            except aiohttp.ClientResponseError as err:
+                # Non-retryable client (4xx) error.
+                raise FermaxConnectionError(
+                    f"HTTP error {err.status}: {err.message}"
+                ) from err
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                last_error = FermaxConnectionError(f"Request error: {err}")
+
+            if attempt < MAX_RETRIES - 1:
+                delay = RETRY_BACKOFF_BASE * (2 ** attempt)
+                LOGGER.debug(
+                    "Request to %s failed (attempt %d/%d), retrying in %.1fs",
+                    url,
+                    attempt + 1,
+                    MAX_RETRIES,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        raise last_error or FermaxConnectionError("Request failed")
 
     @staticmethod
     async def _parse_response(resp: aiohttp.ClientResponse) -> Any:
@@ -427,3 +461,100 @@ class FermaxClient:
         if call_as:
             body["callAs"] = call_as
         await self._async_request("POST", url, json=body)
+
+    async def async_open_door_incall(
+        self,
+        device_id: str,
+        room_id: str | None = None,
+        app_token_id: str | None = None,
+        call_as: str | None = None,
+    ) -> None:
+        """Open a door during an active call/stream session."""
+        url = f"{BASE_URL}/deviceaction/api/v1/device/incall/opendoor"
+        await self._async_request(
+            "POST",
+            url,
+            json={
+                "deviceId": device_id,
+                "roomId": room_id,
+                "appTokenId": app_token_id,
+                "unitId": call_as,
+            },
+        )
+
+    async def async_change_video_source(
+        self, device_id: str, gcm_token: str
+    ) -> None:
+        """Request a video source change on the intercom (V2 API)."""
+        url = (
+            f"{BASE_URL}/deviceaction/api/v2/device/{device_id}/changevideosource"
+        )
+        await self._async_request(
+            "POST",
+            url,
+            json={
+                "directedToBluestream": gcm_token,
+                "directedToSippo": None,
+                "callAs": None,
+            },
+        )
+
+    async def async_call_guard(self, device_id: str) -> None:
+        """Call the building's guard/concierge unit."""
+        url = f"{BASE_URL}/deviceaction/api/v1/device/{device_id}/callguard"
+        await self._async_request("POST", url)
+
+    async def async_get_dnd_status(
+        self, device_id: str, gcm_token: str
+    ) -> bool:
+        """Return the Do Not Disturb (mute) status for a device."""
+        url = (
+            f"{BASE_URL}/notification/api/v1/mutedevice/me"
+            f"?deviceId={device_id}&token={gcm_token}"
+        )
+        data = await self._async_request("GET", url)
+        # The API may return a bare bool or a dict with a ``muted`` key.
+        if isinstance(data, bool):
+            return data
+        if isinstance(data, dict):
+            return bool(data.get("muted", False))
+        return False
+
+    async def async_set_dnd(
+        self, device_id: str, gcm_token: str, enabled: bool
+    ) -> None:
+        """Enable or disable Do Not Disturb (mute) for a device."""
+        url = f"{BASE_URL}/notification/api/v1/mutedevice/me"
+        await self._async_request(
+            "POST",
+            url,
+            json={"deviceId": device_id, "token": gcm_token, "muted": enabled},
+        )
+
+    async def async_set_photo_caller(
+        self, device_id: str, enabled: bool
+    ) -> None:
+        """Enable or disable the photo caller feature on a device."""
+        value = "true" if enabled else "false"
+        url = (
+            f"{BASE_URL}/deviceaction/api/v1/{device_id}/photocaller?value={value}"
+        )
+        await self._async_request("PUT", url)
+
+    async def async_get_opening_history(
+        self, device_id: str
+    ) -> list[dict[str, Any]]:
+        """Return the door opening history for a device."""
+        url = (
+            f"{BASE_URL}/rexistro/api/v1/opendoorregistry?deviceId={device_id}"
+        )
+        try:
+            data = await self._async_request("GET", url)
+        except FermaxConnectionError:
+            LOGGER.debug("Failed to get opening history", exc_info=True)
+            return []
+        if isinstance(data, dict):
+            registry = data.get("openDoorRegistry", [])
+            if isinstance(registry, list):
+                return registry
+        return []

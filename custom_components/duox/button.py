@@ -19,18 +19,19 @@ async def async_setup_entry(
     client: FermaxClient = hass.data[DOMAIN][config.entry_id]["client"]
     pairings: list[Pairing] = hass.data[DOMAIN][config.entry_id]["pairings"]
 
-    buttons: list[DuoxF1Button] = []
+    buttons: list[ButtonEntity] = []
     for pairing in pairings:
         device_info: FermaxDeviceInfo = hass.data[DOMAIN][config.entry_id][
             "device_info"
         ][pairing.device_id]
         buttons.append(DuoxF1Button(client, pairing.device_id, device_info))
+        buttons.append(DuoxCallGuardButton(client, pairing.device_id, device_info))
 
     async_add_entities(buttons)
 
 
-class DuoxF1Button(ButtonEntity):
-    _attr_icon = "mdi:keyboard-f1"
+class _DuoxButtonBase(ButtonEntity):
+    """Shared device-info plumbing for Duox buttons."""
 
     def __init__(
         self,
@@ -41,11 +42,6 @@ class DuoxF1Button(ButtonEntity):
         self._client = client
         self._device_id = device_id
         self._model = device_info.model
-        self._attr_unique_id = f"{device_id}_f1_button".lower()
-        self._attr_name = "Duox F1"
-
-    async def async_press(self) -> None:
-        await self._client.async_f1(self._device_id)
 
     @property
     def device_info(self) -> DeviceInfo | None:
@@ -56,3 +52,37 @@ class DuoxF1Button(ButtonEntity):
             model=self._model,
             sw_version=HASS_DUOX_VERSION,
         )
+
+
+class DuoxF1Button(_DuoxButtonBase):
+    _attr_icon = "mdi:keyboard-f1"
+
+    def __init__(
+        self,
+        client: FermaxClient,
+        device_id: str,
+        device_info: FermaxDeviceInfo,
+    ) -> None:
+        super().__init__(client, device_id, device_info)
+        self._attr_unique_id = f"{device_id}_f1_button".lower()
+        self._attr_name = "Duox F1"
+
+    async def async_press(self) -> None:
+        await self._client.async_f1(self._device_id)
+
+
+class DuoxCallGuardButton(_DuoxButtonBase):
+    _attr_icon = "mdi:shield-account"
+
+    def __init__(
+        self,
+        client: FermaxClient,
+        device_id: str,
+        device_info: FermaxDeviceInfo,
+    ) -> None:
+        super().__init__(client, device_id, device_info)
+        self._attr_unique_id = f"{device_id}_call_guard_button".lower()
+        self._attr_name = "Duox Call Guard"
+
+    async def async_press(self) -> None:
+        await self._client.async_call_guard(self._device_id)

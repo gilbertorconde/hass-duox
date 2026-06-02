@@ -25,6 +25,11 @@ SIGNAL_CALL_STARTED = "{}_call_started_{}"
 SIGNAL_DOORBELL_RING = "{}_doorbell_ring_{}"
 SIGNAL_CALL_ENDED = "{}_call_ended"
 SIGNAL_CALL_ATTENDED = "{}_call_attended"
+SIGNAL_DOOR_OPENED = "{}_door_opened"
+
+CONF_SCAN_INTERVAL = "scan_interval"
+CONF_SIGNALING_URL = "signaling_url"
+DEFAULT_SCAN_INTERVAL = 60
 
 SIGNALING_SERVER_URL = "http://signaling-pro-duoxme.fermax.io"
 

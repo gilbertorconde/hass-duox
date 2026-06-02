@@ -6,7 +6,14 @@ from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, CONF_LOCK_STATE_RESET
+from .const import (
+    CONF_LOCK_STATE_RESET,
+    CONF_SCAN_INTERVAL,
+    CONF_SIGNALING_URL,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    SIGNALING_SERVER_URL,
+)
 from .fermax_api import FermaxClient, FermaxAuthError
 
 
@@ -99,19 +106,28 @@ class DuoxOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         error_info: dict[str, str] = {}
 
-        lock_timeout = self.config_entry.options.get(CONF_LOCK_STATE_RESET, 5)
+        options = self.config_entry.options
+        lock_timeout = options.get(CONF_LOCK_STATE_RESET, 5)
+        scan_interval = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        signaling_url = options.get(CONF_SIGNALING_URL, SIGNALING_SERVER_URL)
 
         if user_input is not None:
-            if user_input[CONF_LOCK_STATE_RESET] >= 0:
+            if user_input[CONF_LOCK_STATE_RESET] < 0:
+                error_info['base'] = 'negative_value'
+            elif user_input[CONF_SCAN_INTERVAL] < 10:
+                error_info['base'] = 'scan_interval_too_low'
+            else:
+                if not user_input.get(CONF_SIGNALING_URL):
+                    user_input[CONF_SIGNALING_URL] = SIGNALING_SERVER_URL
                 self.hass.config_entries.async_update_entry(self.config_entry, options=user_input)
                 return self.async_create_entry(title=None, data=None)
-            else:
-                error_info['base'] = 'negative_value'
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Required(CONF_LOCK_STATE_RESET, default=lock_timeout): int
+                vol.Required(CONF_LOCK_STATE_RESET, default=lock_timeout): int,
+                vol.Required(CONF_SCAN_INTERVAL, default=scan_interval): int,
+                vol.Optional(CONF_SIGNALING_URL, default=signaling_url): str,
             }),
             errors=error_info
         )

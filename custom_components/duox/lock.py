@@ -7,10 +7,17 @@ from typing import Any
 from homeassistant.components.lock import LockEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_LOCK_STATE_RESET, DEVICE_MANUFACTURER, DOMAIN, HASS_DUOX_VERSION
+from .const import (
+    CONF_LOCK_STATE_RESET,
+    DEVICE_MANUFACTURER,
+    DOMAIN,
+    HASS_DUOX_VERSION,
+    SIGNAL_DOOR_OPENED,
+)
 from .fermax_api import AccessDoor, DeviceInfo as FermaxDeviceInfo, FermaxClient, Pairing
 
 
@@ -75,12 +82,29 @@ class DuoxLock(LockEntity):
         self._attr_is_locked = False
         self.async_write_ha_state()
 
+        async_dispatcher_send(
+            self.hass,
+            SIGNAL_DOOR_OPENED.format(self._device_id),
+            self._door.name,
+        )
+
         await asyncio.sleep(self._lock_timeout)
         self._attr_is_locked = True
         self.async_write_ha_state()
 
     async def async_open(self, **kwargs: Any) -> None:
         await self.async_unlock(**kwargs)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        access_id = self._door.access_id
+        return {
+            "door_name": self._door.name,
+            "door_title": self._door.title,
+            "block": access_id.block,
+            "subblock": access_id.subblock,
+            "number": access_id.number,
+        }
 
     @property
     def device_info(self) -> DeviceInfo | None:

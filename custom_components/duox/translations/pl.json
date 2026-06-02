@@ -31,13 +31,16 @@
             "init": {
                 "title": "Ustawienia integracji",
                 "data": {
-                    "lockStateReset": "Zegar resetowania stanu blokady"
+                    "lockStateReset": "Zegar resetowania stanu blokady",
+                    "scan_interval": "Interwał aktualizacji (sekundy)",
+                    "signaling_url": "Adres URL serwera sygnalizacyjnego (opcjonalnie)"
                 },
-                "description": "Czas do ponownego zablokowania zamka po odblokowaniu, w sekundach."
+                "description": "Zegar blokady: czas do ponownego zablokowania zamka po odblokowaniu (sekundy). Interwał aktualizacji: jak często odpytywany jest status urządzenia (minimum 10s). Adres URL serwera sygnalizacyjnego: pozostaw domyślny, chyba że Twoja instalacja używa niestandardowego serwera."
             }
         },
         "error": {
-            "negative_value": "Wartość musi być liczbą dodatnią"
+            "negative_value": "Wartość musi być liczbą dodatnią",
+            "scan_interval_too_low": "Interwał aktualizacji musi wynosić co najmniej 10 sekund"
         }
     },
     "entity": {

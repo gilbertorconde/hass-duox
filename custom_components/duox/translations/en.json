@@ -31,13 +31,16 @@
             "init": {
                 "title": "Integration Settings",
                 "data": {
-                    "lockStateReset": "Lock state reset timer"
+                    "lockStateReset": "Lock state reset timer",
+                    "scan_interval": "Update interval (seconds)",
+                    "signaling_url": "Signaling server URL override"
                 },
-                "description": "Time to reset the lock back to locked once it is unlocked, in seconds."
+                "description": "Lock reset timer: time to reset the lock back to locked once unlocked (seconds). Update interval: how often device status is polled (minimum 10s). Signaling server URL: leave as default unless your installation uses a custom server."
             }
         },
         "error": {
-            "negative_value": "The value must be a positive number"
+            "negative_value": "The value must be a positive number",
+            "scan_interval_too_low": "The update interval must be at least 10 seconds"
         }
     },
     "entity": {

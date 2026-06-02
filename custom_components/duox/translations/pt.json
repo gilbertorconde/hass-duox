@@ -31,13 +31,16 @@
             "init": {
                 "title": "Definições da integração",
                 "data": {
-                    "lockStateReset": "Temporizador de reset do estado da fechadura"
+                    "lockStateReset": "Temporizador de reset do estado da fechadura",
+                    "scan_interval": "Intervalo de atualização (segundos)",
+                    "signaling_url": "URL do servidor de sinalização (opcional)"
                 },
-                "description": "Tempo para colocar o estado da fechadura como fechado depois de abrir, em segundos."
+                "description": "Temporizador da fechadura: tempo para voltar a bloquear a fechadura depois de abrir (segundos). Intervalo de atualização: com que frequência o estado do dispositivo é consultado (mínimo 10s). URL do servidor de sinalização: deixe o valor padrão a menos que a sua instalação use um servidor personalizado."
             }
         },
         "error": {
-            "negative_value": "O número tem de ser positivo"
+            "negative_value": "O número tem de ser positivo",
+            "scan_interval_too_low": "O intervalo de atualização tem de ser de pelo menos 10 segundos"
         }
     },
     "entity": {

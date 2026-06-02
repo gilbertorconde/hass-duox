@@ -31,13 +31,16 @@
             "init": {
                 "title": "Configuración de la integración",
                 "data": {
-                    "lockStateReset": "Temporizador de reinicio del estado de bloqueo"
+                    "lockStateReset": "Temporizador de reinicio del estado de bloqueo",
+                    "scan_interval": "Intervalo de actualización (segundos)",
+                    "signaling_url": "URL del servidor de señalización (opcional)"
                 },
-                "description": "Tiempo para volver a bloquear la cerradura una vez desbloqueada, en segundos."
+                "description": "Temporizador de bloqueo: tiempo para volver a bloquear la cerradura una vez desbloqueada (segundos). Intervalo de actualización: frecuencia de sondeo del estado del dispositivo (mínimo 10s). URL del servidor de señalización: déjalo por defecto salvo que tu instalación use un servidor personalizado."
             }
         },
         "error": {
-            "negative_value": "El valor debe ser un número positivo."
+            "negative_value": "El valor debe ser un número positivo.",
+            "scan_interval_too_low": "El intervalo de actualización debe ser de al menos 10 segundos"
         }
     },
     "entity": {
